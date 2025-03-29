@@ -1,7 +1,7 @@
 import os
 
 from PyQt6.QtCore import QDir, QThread, QObject, pyqtSignal, pyqtSlot
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QFileDialog
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QFileDialog, QComboBox
 from PyQt6.QtMultimedia import QMediaPlayer
 
 from moviepy import VideoFileClip, VideoClip
@@ -36,9 +36,9 @@ class ClipConcatenator(QObject):
         self.clips = clips
         self.file_path = file_path
 
-    def run_concatenation(self):
+    def run_concatenation(self, method:str='chain'):
         self.video_concat = (CompositeVideoClip
-                             .concatenate_videoclips(self.clips)
+                             .concatenate_videoclips(self.clips, method=method)
                              .write_videofile(self.file_path, logger=WidgetProgressLogger(self.progress))
                              )
         self.finished.emit()
@@ -54,15 +54,20 @@ class VideoEditor(QWidget):
         self.btn_process_file.clicked.connect(self.process_file)
         self.progress_bar = ProgressBar()
         self.progress_bar.setVisible(False)
-        self.btn_debug = QPushButton("DEBUG_editor", parent=self)
+        self.cbox_method = QComboBox()
+        self.cbox_method.addItem('Chain')
+        self.cbox_method.addItem('Compose')
+
+        self.btn_debug = QPushButton("DEBUG_editor")
         self.btn_debug.clicked.connect(self._debug_pressed)
+
 
         self._init_layout()
 
     def _init_layout(self):
         main_layout = QHBoxLayout()
         main_layout.addWidget(self.btn_process_file)
-        main_layout.addWidget(self.btn_debug)
+        main_layout.addWidget(self.cbox_method)
         main_layout.addStretch()
         main_layout.addWidget(self.progress_bar)
         self.setLayout(main_layout)
@@ -85,7 +90,7 @@ class VideoEditor(QWidget):
             file_path=file_path
         )
         self.worker.moveToThread(self.concat_thread)
-        self.concat_thread.started.connect(self.worker.run_concatenation)
+        self.concat_thread.started.connect(lambda: self.worker.run_concatenation(self.cbox_method.currentText().lower()))
         self.worker.finished.connect(self.concat_thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.worker.progress.connect(self.progress_bar.progress_changed)
