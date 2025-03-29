@@ -1,8 +1,7 @@
-from PyQt6.QtCore import QUrl, Qt, QDir, QTime
+from PyQt6.QtCore import QUrl, Qt, QDir, QTime, pyqtSlot
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
-from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QSlider, QFileDialog, QSpacerItem, \
-    QSizePolicy, QLabel
+from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QSlider, QFileDialog, QLabel
 
 
 class VideoPlayer(QWidget):
@@ -26,7 +25,6 @@ class VideoPlayer(QWidget):
         self.video_window.setGeometry(10, 10, 400, 225)
 
         self.player = QMediaPlayer(parent=self)
-        # self.player.setSource(QUrl.fromLocalFile("video/vid1.mp4"))
         self.player.setVideoOutput(self.video_window)
         self.audioOutput = QAudioOutput()
         self.player.setAudioOutput(self.audioOutput)
@@ -53,7 +51,7 @@ class VideoPlayer(QWidget):
         self.btn_stop = QPushButton("Stop", parent=self)
         self.btn_stop.clicked.connect(self.stop_pressed)
 
-        self._connect_video_to_player("video/vid1.mp4")
+        # self._connect_video_to_player("video/vid1.mp4")
 
 
     def init_layout(self):
@@ -112,6 +110,7 @@ class VideoPlayer(QWidget):
     def duration_changed(self, value: int):
         self.video_slider.setRange(0, value)
 
+    @pyqtSlot()
     def play_status_changed(self):
         status = self.player.mediaStatus()
         if status == QMediaPlayer.MediaStatus.LoadedMedia:

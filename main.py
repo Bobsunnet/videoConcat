@@ -5,6 +5,8 @@ from src.video_player import VideoPlayer
 from src.video_editor import VideoEditor
 from src.UI.color import ColorBackground, ColorOptions
 
+from version import VERSION
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
