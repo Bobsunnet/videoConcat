@@ -27,6 +27,7 @@ class VideoPlayer(QWidget):
         self.player = QMediaPlayer(parent=self)
         self.player.setVideoOutput(self.video_window)
         self.audioOutput = QAudioOutput()
+        self.audioOutput.setVolume(0.8)
         self.player.setAudioOutput(self.audioOutput)
 
         self.player.durationChanged.connect(self.duration_changed)
@@ -37,6 +38,11 @@ class VideoPlayer(QWidget):
         self.video_slider.setOrientation(Qt.Orientation.Horizontal)
         self.video_slider.sliderPressed.connect(self.slider_pressed)
         self.video_slider.sliderMoved.connect(self.slider_pressed)
+
+        self.audio_slider = QSlider()
+        self.audio_slider.setOrientation(Qt.Orientation.Horizontal)
+        self.audio_slider.setValue(80)
+        self.audio_slider.sliderMoved.connect(lambda x: self.audioOutput.setVolume(x/100))
 
         self.lbl_timer = QLabel('00:00:00')
         self.lbl_timer.setMaximumHeight(22)
@@ -56,22 +62,23 @@ class VideoPlayer(QWidget):
 
     def init_layout(self):
         main_layout = QVBoxLayout()
-        first_layout = QVBoxLayout()
+        screen_layout = QVBoxLayout()
         slider_layout = QHBoxLayout()
-        second_layout = QHBoxLayout()
 
-        first_layout.addWidget(self.video_window)
+        screen_layout.addWidget(self.video_window)
         slider_layout.addWidget(self.video_slider)
         slider_layout.addWidget(self.lbl_timer)
-        first_layout.addLayout(slider_layout)
+        screen_layout.addLayout(slider_layout)
 
-        main_layout.addLayout(first_layout)
-        main_layout.addLayout(second_layout)
-        second_layout.addWidget(self.btn_open_file)
-        second_layout.addWidget(self.btn_stop)
-        second_layout.addWidget(self.btn_play)
-        second_layout.addSpacing(200)
-        second_layout.addWidget(self.btn_debug)
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addWidget(self.btn_open_file)
+        buttons_layout.addWidget(self.btn_stop)
+        buttons_layout.addWidget(self.btn_play)
+        buttons_layout.addWidget(self.audio_slider)
+        buttons_layout.addWidget(self.btn_debug)
+
+        main_layout.addLayout(screen_layout)
+        main_layout.addLayout(buttons_layout)
 
         self.setLayout(main_layout)
 

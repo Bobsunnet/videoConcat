@@ -17,7 +17,7 @@ class MainWindow(QMainWindow):
         self.editor = VideoEditor(self.left_player, self.right_player)
 
         self.setGeometry(400, 200, 800, 600)
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(1000, 600)
 
         self.init_layout()
 
