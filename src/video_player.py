@@ -4,6 +4,26 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QSlider, QFileDialog, QLabel
 
 
+class DropOverlay(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            file_path = urls[0].toLocalFile()
+            parent = self.parent()
+            if isinstance(parent, VideoPlayer):
+                parent.connect_video_to_player(file_path)
+                parent.change_btn_play_name(True)
+
+
 class VideoPlayer(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -15,14 +35,20 @@ class VideoPlayer(QWidget):
 
         self.btn_debug = QPushButton("DEBUG", parent=self)
         self.btn_debug.setStyleSheet('background-color: #bbb;')
-        self.btn_debug.clicked.connect(self.debug_pressed)
+        self.btn_debug.clicked.connect(self._debug_pressed)
 
         self.create_player()
         self.init_layout()
 
+    def resizeEvent(self, event):
+        self.drop_overlay.setGeometry(self.video_window.geometry())
+        super().resizeEvent(event)
+
     def create_player(self):
         self.video_window = QVideoWidget(parent=self)
         self.video_window.setGeometry(10, 10, 400, 225)
+        self.drop_overlay = DropOverlay(self)
+        self.drop_overlay.setGeometry(self.video_window.geometry())
 
         self.player = QMediaPlayer(parent=self)
         self.player.setVideoOutput(self.video_window)
@@ -33,6 +59,7 @@ class VideoPlayer(QWidget):
         self.player.durationChanged.connect(self.duration_changed)
         self.player.positionChanged.connect(self.player_position_changed)
         self.player.mediaStatusChanged.connect(self.play_status_changed)
+        self.player.mediaStatusChanged.connect(self._debug_action)
 
         self.video_slider = QSlider(parent=self)
         self.video_slider.setOrientation(Qt.Orientation.Horizontal)
@@ -57,9 +84,6 @@ class VideoPlayer(QWidget):
         self.btn_stop = QPushButton("Stop", parent=self)
         self.btn_stop.clicked.connect(self.stop_pressed)
 
-        # self._connect_video_to_player("video/vid1.mp4")
-
-
     def init_layout(self):
         main_layout = QVBoxLayout()
         screen_layout = QVBoxLayout()
@@ -82,20 +106,24 @@ class VideoPlayer(QWidget):
 
         self.setLayout(main_layout)
 
-    def debug_pressed(self, value=None):
+    def _debug_pressed(self, value=None):
         """"""
 
+    def _debug_action(self, value=None):
+        """"""
+        print(self.player.mediaStatus())
+
     def play_pressed(self):
-        status = self.player.isPlaying()
-        self.change_btn_play_name(status)
+        playing = self.player.isPlaying()
+        self.change_btn_play_name(playing)
 
         if self.player.isPlaying():
             self.player.pause()
         else:
             self.player.play()
 
-    def change_btn_play_name(self, play: bool):
-        if play:
+    def change_btn_play_name(self, status: bool):
+        if status:
             self.btn_play.setText("Play")
         else:
             self.btn_play.setText("Pause")
@@ -136,9 +164,9 @@ class VideoPlayer(QWidget):
         print('open status: ', filename)
 
         if filename != '':
-            self._connect_video_to_player(filename)
+            self.connect_video_to_player(filename)
 
-    def _connect_video_to_player(self, file_path:str):
+    def connect_video_to_player(self, file_path:str):
         self.player.setSource(QUrl.fromLocalFile(file_path))
         self.filename = file_path
         self.change_btn_play_name(True)

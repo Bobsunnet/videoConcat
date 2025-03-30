@@ -190,3 +190,4 @@ video
 .avi
 *.json
 playground.py
+/snippets.py
