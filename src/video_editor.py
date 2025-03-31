@@ -1,6 +1,6 @@
 import os
 
-from PyQt6.QtCore import QDir, QThread, QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QDir, QObject, pyqtSignal, pyqtSlot, QRunnable, QThreadPool
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QFileDialog, QComboBox
 from PyQt6.QtMultimedia import QMediaPlayer
 
@@ -26,27 +26,38 @@ class VideoCutter:
             print("No file edited")
 
 
-class ClipConcatenator(QObject):
+class ConcatenatorSignals(QObject):
     finished = pyqtSignal()
     progress = pyqtSignal(int)
+    error = pyqtSignal(str)
 
-    def __init__(self, clips: list[VideoFileClip], file_path: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+
+class ConcatenatorWorker(QRunnable):
+
+    def __init__(self, clips: list[VideoFileClip], file_path: str):
+        super().__init__()
         self.video_concat: VideoClip | None = None
+        self.signals = ConcatenatorSignals()
         self.clips = clips
         self.file_path = file_path
 
-    def run_concatenation(self, method:str='chain'):
-        self.video_concat = (CompositeVideoClip
+    def run(self, method:str='chain'):
+        try:
+            self.video_concat = (CompositeVideoClip
                              .concatenate_videoclips(self.clips, method=method)
-                             .write_videofile(self.file_path, logger=WidgetProgressLogger(self.progress))
+                             .write_videofile(self.file_path, logger=WidgetProgressLogger(self.signals.progress))
                              )
-        self.finished.emit()
+        except Exception as e:
+            self.signals.error.emit("ERROR "+ str(e))
+
+        else:
+            self.signals.finished.emit()
 
 
 class VideoEditor(QWidget):
     def __init__(self, left_player, right_player, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.threadpool = QThreadPool()
         self.player1 = left_player
         self.player2 = right_player
         self.btn_process_file = QPushButton("Process File", parent=self)
@@ -61,7 +72,6 @@ class VideoEditor(QWidget):
         self.btn_debug = QPushButton("DEBUG_editor")
         self.btn_debug.clicked.connect(self._debug_pressed)
 
-
         self._init_layout()
 
     def _init_layout(self):
@@ -74,7 +84,7 @@ class VideoEditor(QWidget):
 
     def process_file(self):
         if not self._player_status_check():
-            print('No media ready to concatenation')
+            print('No media ready for concatenation')
             return
 
         folder_path = QFileDialog().getExistingDirectory(self, 'Destination Folder', QDir.currentPath())
@@ -83,22 +93,17 @@ class VideoEditor(QWidget):
 
         self.progress_bar.setVisible(True)
         file_path = self._create_concat_file_path(folder_path)
-        self.concat_thread = QThread()
-        self.worker = ClipConcatenator(
+        worker = ConcatenatorWorker(
             [VideoFileClip(self.player1.filename),
              VideoFileClip(self.player2.filename)],
             file_path=file_path
         )
-        self.worker.moveToThread(self.concat_thread)
-        self.concat_thread.started.connect(lambda: self.worker.run_concatenation(self.cbox_method.currentText().lower()))
-        self.worker.finished.connect(self.concat_thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.worker.progress.connect(self.progress_bar.progress_changed)
-        self.concat_thread.finished.connect(self.concat_thread.deleteLater)
-        self.concat_thread.start()
-
+        worker.signals.progress.connect(self.progress_bar.progress_changed)
+        worker.signals.finished.connect(self._processing_finished)
+        worker.signals.error.connect(self.worker_error)
         self.btn_process_file.setEnabled(False)
-        self.concat_thread.finished.connect(self._processing_finished)
+
+        self.threadpool.start(worker)
 
     @pyqtSlot()
     def _processing_finished(self):
@@ -128,6 +133,10 @@ class VideoEditor(QWidget):
         concat_name = file1_name +'__'+ file2_name + '.mp4'
         save_path = os.path.join(folder_path, concat_name)
         return save_path
+
+    @pyqtSlot(str)
+    def worker_error(self, error:str):
+        print('ERROR: %s' % error)
 
 
 if __name__ == '__main__':
