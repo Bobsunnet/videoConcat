@@ -58,7 +58,7 @@ class VideoPlayer(QWidget):
         self.audio_slider = QSlider()
         self.audio_slider.setOrientation(Qt.Orientation.Horizontal)
         self.audio_slider.setValue(80)
-        self.audio_slider.sliderMoved.connect(lambda x: self.audioOutput.setVolume(x / 100))
+        self.audio_slider.valueChanged.connect(lambda x: self.audioOutput.setVolume(x / 100))
 
         self.lbl_timer = QLabel('00:00:00')
         self.lbl_timer.setMaximumHeight(22)
