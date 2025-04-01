@@ -1,4 +1,4 @@
-# VideoConcat v.0.2.0
+# VideoConcat v.0.2.1
 **Program to concatenate videos**
 
 You can use this program to concatenate multiple(now only two) videos into one.

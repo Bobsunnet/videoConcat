@@ -37,17 +37,18 @@ class ConcatenatorSignals(QObject):
 
 class ConcatenatorWorker(QRunnable):
 
-    def __init__(self, clips: list[VideoFileClip], file_path: str):
+    def __init__(self, clips: list[VideoFileClip], file_path: str, method: str = 'chain'):
         super().__init__()
         self.video_concat: VideoClip | None = None
         self.signals = ConcatenatorSignals()
         self.clips = clips
         self.file_path = file_path
+        self.method = method
 
-    def run(self, method:str='chain'):
+    def run(self):
         try:
             self.video_concat = (CompositeVideoClip
-                             .concatenate_videoclips(self.clips, method=method)
+                             .concatenate_videoclips(self.clips, method=self.method)
                              .write_videofile(self.file_path, logger=WidgetProgressLogger(self.signals.progress))
                              )
         except Exception as e:
@@ -101,7 +102,8 @@ class VideoEditor(QWidget):
         worker = ConcatenatorWorker(
             [VideoFileClip(self.player1.filename),
              VideoFileClip(self.player2.filename)],
-            file_path=file_path
+            file_path=file_path,
+            method=self.cbox_method.currentText().lower()
         )
         worker.signals.progress.connect(self.progress_bar.progress_changed)
         worker.signals.finished.connect(self._processing_finished)
