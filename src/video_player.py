@@ -3,6 +3,8 @@ from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QSlider, QFileDialog, QLabel
 
+from src import debug_manager
+
 
 class DropOverlay(QWidget):
     def __init__(self, parent=None):
@@ -33,18 +35,6 @@ class VideoPlayer(QWidget):
         self.setGeometry(10, 10, 400, 300)
         self.setStyleSheet('background-color: #99a;')
 
-        self.btn_debug = QPushButton("DEBUG", parent=self)
-        self.btn_debug.setStyleSheet('background-color: #bbb;')
-        self.btn_debug.clicked.connect(self._debug_pressed)
-
-        self.create_player()
-        self.init_layout()
-
-    def resizeEvent(self, event):
-        self.drop_overlay.setGeometry(self.video_window.geometry())
-        super().resizeEvent(event)
-
-    def create_player(self):
         self.video_window = QVideoWidget(parent=self)
         self.video_window.setGeometry(10, 10, 400, 225)
         self.drop_overlay = DropOverlay(self)
@@ -59,7 +49,6 @@ class VideoPlayer(QWidget):
         self.player.durationChanged.connect(self.duration_changed)
         self.player.positionChanged.connect(self.player_position_changed)
         self.player.mediaStatusChanged.connect(self.play_status_changed)
-        self.player.mediaStatusChanged.connect(self._debug_action)
 
         self.video_slider = QSlider(parent=self)
         self.video_slider.setOrientation(Qt.Orientation.Horizontal)
@@ -69,7 +58,7 @@ class VideoPlayer(QWidget):
         self.audio_slider = QSlider()
         self.audio_slider.setOrientation(Qt.Orientation.Horizontal)
         self.audio_slider.setValue(80)
-        self.audio_slider.sliderMoved.connect(lambda x: self.audioOutput.setVolume(x/100))
+        self.audio_slider.sliderMoved.connect(lambda x: self.audioOutput.setVolume(x / 100))
 
         self.lbl_timer = QLabel('00:00:00')
         self.lbl_timer.setMaximumHeight(22)
@@ -84,7 +73,18 @@ class VideoPlayer(QWidget):
         self.btn_stop = QPushButton("Stop", parent=self)
         self.btn_stop.clicked.connect(self.stop_pressed)
 
-    def init_layout(self):
+        self.btn_debug = QPushButton("DEBUG", parent=self)
+        self.btn_debug.clicked.connect(self._debug_pressed)
+        debug_manager.register_widget(self.btn_debug)
+        debug_manager.register_signal(self.player.mediaStatusChanged, self._debug_action)
+
+        self.init_layout()
+
+    def resizeEvent(self, event):
+        self.drop_overlay.setGeometry(self.video_window.geometry())
+        super().resizeEvent(event)
+
+    def init_layout(self, debug_btn=None):
         main_layout = QVBoxLayout()
         screen_layout = QVBoxLayout()
         slider_layout = QHBoxLayout()

@@ -10,6 +10,8 @@ from moviepy.video.compositing import CompositeVideoClip
 from src.UI.progress_bar import ProgressBar
 from src.widget_logger import WidgetProgressLogger
 
+from src import debug_manager
+
 
 class VideoCutter:
     def __init__(self):
@@ -27,6 +29,7 @@ class VideoCutter:
 
 
 class ConcatenatorSignals(QObject):
+    """Signals container for ConcatenatorWorker"""
     finished = pyqtSignal()
     progress = pyqtSignal(int)
     error = pyqtSignal(str)
@@ -71,6 +74,7 @@ class VideoEditor(QWidget):
 
         self.btn_debug = QPushButton("DEBUG_editor")
         self.btn_debug.clicked.connect(self._debug_pressed)
+        debug_manager.register_widget(self.btn_debug)
 
         self._init_layout()
 
@@ -142,6 +146,19 @@ class VideoEditor(QWidget):
         return True
 
     def _create_concat_file_path(self, folder_path:str)->str:
+        """
+        Creates a file path for concatenated video
+
+        Concatenates the names of the two files, removes the extension
+        and adds '.mp4' to the end of the new name.
+
+        Args:
+            folder_path (str): The path to the folder where the new file
+                should be saved.
+
+        Returns:
+            str: The full path to the new file.
+        """
         file1_name = os.path.split(self.player1.filename)[-1].rpartition('.')[0]
         file2_name = os.path.split(self.player2.filename)[-1].rpartition('.')[0]
         concat_name = file1_name +'__'+ file2_name + '.mp4'

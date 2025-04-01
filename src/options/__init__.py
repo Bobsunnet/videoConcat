@@ -1,2 +1,2 @@
 from .constants import *
-from .options import options
+from .options import options, DEBUG
