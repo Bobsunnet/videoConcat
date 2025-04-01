@@ -1,17 +1,18 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
 
 from src.video_player import VideoPlayer
 from src.video_editor import VideoEditor
 from src.UI.color import ColorBackground, ColorOptions
 
-from version import VERSION
+from update_checker import UpdateManager
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Video Concatenator")
+        self.update_manager = UpdateManager()
         self.left_player = VideoPlayer(parent=self)
         self.right_player = VideoPlayer(parent=self)
         self.editor = VideoEditor(self.left_player, self.right_player)
@@ -20,6 +21,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1000, 600)
 
         self.init_layout()
+        self.update_manager.check_for_updates()
 
     def init_layout(self):
         main_layout_widget = ColorBackground(ColorOptions.darker)
