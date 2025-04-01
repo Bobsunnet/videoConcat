@@ -78,6 +78,7 @@ class VideoEditor(QWidget):
         main_layout = QHBoxLayout()
         main_layout.addWidget(self.btn_process_file)
         main_layout.addWidget(self.cbox_method)
+        main_layout.addWidget(self.btn_debug)
         main_layout.addStretch()
         main_layout.addWidget(self.progress_bar)
         self.setLayout(main_layout)
@@ -107,15 +108,28 @@ class VideoEditor(QWidget):
 
     @pyqtSlot()
     def _processing_finished(self):
+        """ Slot called when the processing is finished """
         self.progress_bar.init_scale()
         self.progress_bar.setVisible(False)
         self.btn_process_file.setEnabled(True)
 
     @pyqtSlot()
     def _debug_pressed(self):
-        self._player_status_check()
+        """
+        Debug button pressed."""
+        res = self._create_concat_file_path('D:/abc/folder/')
+        print(res)
 
     def _player_status_check(self) ->bool:
+        """
+        Checks if both players have valid media status.
+
+        Checks if the media status of both players is not in the list of
+        invalid statuses.
+
+        Returns:
+            bool: True if both status are valid, False otherwise.
+        """
         invalid_status = [QMediaPlayer.MediaStatus.LoadingMedia,
                           QMediaPlayer.MediaStatus.InvalidMedia,
                           QMediaPlayer.MediaStatus.NoMedia,
@@ -128,8 +142,8 @@ class VideoEditor(QWidget):
         return True
 
     def _create_concat_file_path(self, folder_path:str)->str:
-        file1_name = os.path.split(self.player1.filename)[-1].split('.')[0]
-        file2_name = os.path.split(self.player2.filename)[-1].split('.')[0]
+        file1_name = os.path.split(self.player1.filename)[-1].rpartition('.')[0]
+        file2_name = os.path.split(self.player2.filename)[-1].rpartition('.')[0]
         concat_name = file1_name +'__'+ file2_name + '.mp4'
         save_path = os.path.join(folder_path, concat_name)
         return save_path
