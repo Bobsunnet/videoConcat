@@ -41,7 +41,7 @@ class UpdateManager(QWidget):
             response = requests.get(url, stream=True)
             response.raise_for_status()
             total_size = int(response.headers.get('content-length', 0))
-            filename = 'videoConcat_' + url.split('/')[-1]
+            filename = url.split('/')[-1]
 
             progress_bar = QProgressDialog("Downloading update...", "Cancel", 0, total_size, self)
             progress_bar.setWindowModality(Qt.WindowModality.WindowModal)
@@ -62,9 +62,10 @@ class UpdateManager(QWidget):
                             return
             QMessageBox.information(self, "Update Downloaded", f"Update downloaded to {filename}, "
                                                                f"restart application manually from downloaded file.")
-            # os.startfile(filename)
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to download update: \n{str(e)}")
+
 
 if __name__ == '__main__':
     pass

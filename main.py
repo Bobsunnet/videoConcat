@@ -1,11 +1,11 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QStatusBar
 
 from src.video_player import VideoPlayer
 from src.video_editor import VideoEditor
 from src.UI.color import ColorBackground, ColorOptions
 
-from update_checker import UpdateManager
+from src.updater import UpdateManager
 
 
 class MainWindow(QMainWindow):
@@ -15,7 +15,9 @@ class MainWindow(QMainWindow):
         self.update_manager = UpdateManager()
         self.left_player = VideoPlayer(parent=self)
         self.right_player = VideoPlayer(parent=self)
-        self.editor = VideoEditor(self.left_player, self.right_player)
+        self.editor = VideoEditor(self.left_player, self.right_player, parent=self)
+        self.status_bar = QStatusBar(self)
+        self.setStatusBar(self.status_bar)
 
         self.setGeometry(400, 200, 800, 600)
         self.setMinimumSize(1000, 600)

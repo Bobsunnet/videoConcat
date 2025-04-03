@@ -62,6 +62,7 @@ class VideoEditor(QWidget):
     def __init__(self, left_player, right_player, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.threadpool = QThreadPool()
+        self.parent = kwargs.get('parent', None)
         self.player1 = left_player
         self.player2 = right_player
         self.btn_process_file = QPushButton("Process File", parent=self)
@@ -124,7 +125,7 @@ class VideoEditor(QWidget):
         """
         Debug button pressed."""
         res = self._create_concat_file_path('D:/abc/folder/')
-        print(res)
+        self.parent.status_bar.showMessage(res)
 
     def _player_status_check(self) ->bool:
         """
