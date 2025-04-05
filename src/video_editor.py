@@ -1,14 +1,16 @@
 import os
 
 from PyQt6.QtCore import QDir, QObject, pyqtSignal, pyqtSlot, QRunnable, QThreadPool
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QFileDialog, QComboBox
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QFileDialog, QComboBox, QVBoxLayout
 from PyQt6.QtMultimedia import QMediaPlayer
 
 from moviepy import VideoFileClip, VideoClip
 from moviepy.video.compositing import CompositeVideoClip
 
+from src.UI.color import ColorBackground, ColorOptions
 from src.UI.progress_bar import ProgressBar
 from src.widget_logger import WidgetProgressLogger
+from src.TracksView import PreviewWindow
 
 from src import debug_manager
 
@@ -61,6 +63,7 @@ class ConcatenatorWorker(QRunnable):
 class VideoEditor(QWidget):
     def __init__(self, left_player, right_player, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.preview_window = PreviewWindow()
         self.threadpool = QThreadPool()
         self.parent = kwargs.get('parent', None)
         self.player1 = left_player
@@ -81,12 +84,21 @@ class VideoEditor(QWidget):
         self._init_layout()
 
     def _init_layout(self):
-        main_layout = QHBoxLayout()
-        main_layout.addWidget(self.btn_process_file)
-        main_layout.addWidget(self.cbox_method)
-        main_layout.addWidget(self.btn_debug)
-        main_layout.addStretch()
-        main_layout.addWidget(self.progress_bar)
+        main_layout = QVBoxLayout()
+        preview_background = ColorBackground(ColorOptions.darker)
+        preview_layout = QHBoxLayout()
+        preview_layout.addWidget(self.preview_window)
+        preview_background.setLayout(preview_layout)
+
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addWidget(self.btn_process_file)
+        buttons_layout.addWidget(self.cbox_method)
+        buttons_layout.addWidget(self.btn_debug)
+        buttons_layout.addStretch()
+        buttons_layout.addWidget(self.progress_bar)
+        main_layout.addWidget(preview_background)
+        main_layout.addLayout(buttons_layout)
+
         self.setLayout(main_layout)
 
     def process_file(self):
