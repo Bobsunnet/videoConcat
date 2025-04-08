@@ -63,9 +63,6 @@ class VideoPlayer(QWidget):
         self.lbl_timer = QLabel('00:00:00')
         self.lbl_timer.setMaximumHeight(22)
 
-        self.btn_open_file = QPushButton("Open File", parent=self)
-        self.btn_open_file.clicked.connect(self.open_file)
-
         self.btn_play = QPushButton("Play", parent=self)
         self.btn_play.setEnabled(False)
         self.btn_play.clicked.connect(self.play_pressed)
@@ -95,7 +92,6 @@ class VideoPlayer(QWidget):
         screen_layout.addLayout(slider_layout)
 
         buttons_layout = QHBoxLayout()
-        buttons_layout.addWidget(self.btn_open_file)
         buttons_layout.addWidget(self.btn_stop)
         buttons_layout.addWidget(self.btn_play)
         buttons_layout.addWidget(self.audio_slider)
@@ -154,17 +150,6 @@ class VideoPlayer(QWidget):
             self.btn_play.setEnabled(False)
         elif status == QMediaPlayer.MediaStatus.EndOfMedia:
             self.change_btn_play_name(True)
-
-    def open_file(self):
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open Video File',
-                                                  QDir.currentPath(),
-                                                  "Media (*.webm *.mp4 *.ts *.avi *.mpeg *.mpg *.mkv *.VOB *.m4v *.3gp "
-                                                  "*.mp3 *.m4a *.wav *.ogg *.flac *.m3u *.m3u8)")
-
-        print('open status: ', filename)
-
-        if filename != '':
-            self.connect_video_to_player(filename)
 
     def connect_video_to_player(self, file_path:str):
         self.player.setSource(QUrl.fromLocalFile(file_path))

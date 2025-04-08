@@ -13,14 +13,13 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Video Concatenator")
         self.update_manager = UpdateManager()
-        self.left_player = VideoPlayer(parent=self)
-        self.right_player = VideoPlayer(parent=self)
-        self.editor = VideoEditor(self.left_player, self.right_player, parent=self)
+        self.video_player = VideoPlayer(parent=self)
+        self.editor = VideoEditor(self.video_player, parent=self)
         self.status_bar = QStatusBar(self)
         self.setStatusBar(self.status_bar)
 
-        self.setGeometry(400, 200, 800, 600)
-        self.setMinimumSize(1000, 600)
+        self.setGeometry(400, 100, 1000, 800)
+        self.setMinimumSize(1000, 800)
 
         self.init_layout()
         self.update_manager.check_for_updates()
@@ -31,8 +30,7 @@ class MainWindow(QMainWindow):
 
         video_player_background = ColorBackground(ColorOptions.dim)
         video_layout = QHBoxLayout()
-        video_layout.addWidget(self.left_player)
-        video_layout.addWidget(self.right_player)
+        video_layout.addWidget(self.video_player)
         video_player_background.setLayout(video_layout)
 
         editor_background = ColorBackground(ColorOptions.darkish_lighter)
@@ -48,10 +46,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(main_layout_widget)
 
 
-
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.left_player.audioOutput.setVolume(0.8)
+    window.video_player.audioOutput.setVolume(0.8)
     window.show()
     sys.exit(app.exec())

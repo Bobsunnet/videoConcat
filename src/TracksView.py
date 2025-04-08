@@ -1,9 +1,10 @@
-import sys
-
+import numpy as np
 from PyQt6.QtCore import QPointF
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QPushButton, QVBoxLayout, QWidget, QGraphicsItem, \
+from PyQt6.QtGui import QPixmap, QImage
+from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QPushButton, QWidget, QGraphicsItem, \
     QGraphicsPixmapItem, QHBoxLayout
+
+from moviepy import VideoFileClip
 
 from src import debug_manager
 
@@ -19,13 +20,14 @@ class Scene(QGraphicsScene):
 
 
 class VideoPreviewItem(QGraphicsPixmapItem):
-    def __init__(self, pixmap: QPixmap, scene: Scene, init_pos: QPointF = None, file: str = None):
+    def __init__(self, pixmap: QPixmap, scene: Scene, init_pos: QPointF, clip: VideoFileClip):
         super().__init__(pixmap)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.scene = scene
         self.prev_pos = init_pos
-        self.file_name = file
+        self.clip = clip
+        self.file_name = clip.filename
         self.setPos(init_pos)
 
     def _change_order(self, proposed_pos: QPointF):
@@ -62,7 +64,7 @@ class VideoPreviewItem(QGraphicsPixmapItem):
         super().mouseReleaseEvent(event)
 
     def __repr__(self):
-        return f'{self.file_name}; pos: {self.x()}'
+        return f'{self.clip.filename if self.clip else self.file_name}; pos: {self.x()}'
 
 
 class PreviewWindow(QWidget):
@@ -84,32 +86,50 @@ class PreviewWindow(QWidget):
         layout = QHBoxLayout()
         layout.addWidget(self.btn_debug)
         layout.addWidget(self.track_view)
-        # layout.addStretch()
         self.setLayout(layout)
 
     def debug_pressed(self, value=None):
-        self.add_video_preview('./snippets/img/seagull.jpg')
         print(self.scene.get_items())
 
     def init_scene_mock(self):
         start_img_width = 100
         step = 50
         pos = self.scene.ITEMS_ROFFSET
-        for i, img_path in enumerate(['./snippets/img/flowers.jpg',
-                                      './snippets/img/sunset.jpg',
-                                      './snippets/img/pyramid.jpg',]):
+        for i, img_path in enumerate(['D:/PythonProjects/videoConcat/video/vid_sample.avi', 'D:/PythonProjects/videoConcat/video/vid2.mp4']):
+            clip = VideoFileClip(img_path)
+            frame = clip.get_frame(1)
             width = start_img_width + i * step
-            pixmap_item = VideoPreviewItem(QPixmap(img_path).scaled(width, 50), self.scene, QPointF(pos, 0), img_path)
+            pixmap_item = VideoPreviewItem(self.frame_to_pixmap(frame).scaled(width, 50),
+                                           self.scene,
+                                           QPointF(pos, 0),
+                                           clip)
             self.scene.addItem(pixmap_item)
             pos += width
 
+    @staticmethod
+    def frame_to_pixmap(frame: np.ndarray):
+        h, w, ch = frame.shape
+        image = QImage(frame.tobytes(), w, h, QImage.Format.Format_RGB888)
+        return QPixmap.fromImage(image)
+
+    def _find_pos_x(self):
+        items_list = self.scene.get_items()
+        pos_x = self.scene.ITEMS_ROFFSET
+        if items_list:
+            pos_x = items_list[-1].x() + items_list[-1].sceneBoundingRect().width()
+
+        return pos_x
+
     def add_video_preview(self, file_path: str):
-        pos = self.scene.get_items()[-1].x() + self.scene.get_items()[-1].sceneBoundingRect().width()
+        clip = VideoFileClip(file_path)
+        frame = clip.get_frame(1)
+        pixmap = self.frame_to_pixmap(frame)
+
         pixmap_item = VideoPreviewItem(
-            QPixmap(file_path).scaled(100, 50),
+            pixmap.scaled(100, 50),
             self.scene,
-            QPointF(pos, 0),
-            file_path,
+            QPointF(self._find_pos_x(), 0),
+            clip,
         )
         self.scene.addItem(pixmap_item)
 

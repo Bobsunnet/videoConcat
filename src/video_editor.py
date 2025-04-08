@@ -61,13 +61,15 @@ class ConcatenatorWorker(QRunnable):
 
 
 class VideoEditor(QWidget):
-    def __init__(self, left_player, right_player, *args, **kwargs):
+    def __init__(self, video_player, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.preview_window = PreviewWindow()
         self.threadpool = QThreadPool()
         self.parent = kwargs.get('parent', None)
-        self.player1 = left_player
-        self.player2 = right_player
+        self.player = video_player
+        self.btn_open_file = QPushButton("Open File", parent=self)
+        self.btn_open_file.clicked.connect(self.add_file_to_view)
+
         self.btn_process_file = QPushButton("Process File", parent=self)
         self.btn_process_file.setMinimumSize(100, 30)
         self.btn_process_file.clicked.connect(self.process_file)
@@ -91,6 +93,7 @@ class VideoEditor(QWidget):
         preview_background.setLayout(preview_layout)
 
         buttons_layout = QHBoxLayout()
+        buttons_layout.addWidget(self.btn_open_file)
         buttons_layout.addWidget(self.btn_process_file)
         buttons_layout.addWidget(self.cbox_method)
         buttons_layout.addWidget(self.btn_debug)
@@ -102,20 +105,28 @@ class VideoEditor(QWidget):
         self.setLayout(main_layout)
 
     def process_file(self):
-        if not self._player_status_check():
-            print('No media ready for concatenation')
-            return
+        # if not self._player_status_check():
+        #     print('No media ready for concatenation')
+        #     return
 
         folder_path = QFileDialog().getExistingDirectory(self, 'Destination Folder', QDir.currentPath())
         if folder_path == '':
             return
 
+        clip_items = [item.clip for item in self.preview_window.scene.get_items()]
+
+        if len(clip_items) == 0:
+            print("No videos in preview window.")
+            return
+
         self.progress_bar.setVisible(True)
-        file_path = self._create_concat_file_path(folder_path)
-        worker = ConcatenatorWorker(
-            [VideoFileClip(self.player1.filename),
-             VideoFileClip(self.player2.filename)],
-            file_path=file_path,
+        res_file_path = self._create_concat_file_path(
+            folder_path,
+            [clip.filename for clip in clip_items],
+            )
+
+        worker = ConcatenatorWorker(clip_items,
+            file_path=res_file_path,
             method=self.cbox_method.currentText().lower()
         )
         worker.signals.progress.connect(self.progress_bar.progress_changed)
@@ -136,8 +147,6 @@ class VideoEditor(QWidget):
     def _debug_pressed(self):
         """
         Debug button pressed."""
-        res = self._create_concat_file_path('D:/abc/folder/')
-        self.parent.status_bar.showMessage(res)
 
     def _player_status_check(self) ->bool:
         """
@@ -153,14 +162,13 @@ class VideoEditor(QWidget):
                           QMediaPlayer.MediaStatus.InvalidMedia,
                           QMediaPlayer.MediaStatus.NoMedia,
                           QMediaPlayer.MediaStatus.StalledMedia]
-        status1 = self.player1.player.mediaStatus() in invalid_status
-        status2 = self.player2.player.mediaStatus() in invalid_status
-        if any([status1, status2]):
+        bad_status = self.player.player.mediaStatus() in invalid_status
+        if bad_status:
             return False
 
         return True
 
-    def _create_concat_file_path(self, folder_path:str)->str:
+    def _create_concat_file_path(self, folder_path:str, files_list:list[str])->str:
         """
         Creates a file path for concatenated video
 
@@ -174,11 +182,23 @@ class VideoEditor(QWidget):
         Returns:
             str: The full path to the new file.
         """
-        file1_name = os.path.split(self.player1.filename)[-1].rpartition('.')[0]
-        file2_name = os.path.split(self.player2.filename)[-1].rpartition('.')[0]
-        concat_name = file1_name +'__'+ file2_name + '.mp4'
-        save_path = os.path.join(folder_path, concat_name)
+        concat_final_name = ''
+        for file_name in files_list:
+            concat_final_name += os.path.split(file_name)[-1].rpartition('.')[0]
+            concat_final_name += '__'
+
+        concat_final_name += '.mp4'
+        save_path = os.path.join(folder_path, concat_final_name)
         return save_path
+
+    def add_file_to_view(self):
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open Video File',
+                                                  QDir.currentPath(),
+                                                  "Media (*.webm *.mp4 *.ts *.avi *.mpeg *.mpg *.mkv *.VOB *.m4v *.3gp "
+                                                  "*.mp3 *.m4a *.wav *.ogg *.flac *.m3u *.m3u8)")
+
+        if filename != '':
+            self.preview_window.add_video_preview(filename)
 
     @pyqtSlot(str)
     def worker_error(self, error:str):
