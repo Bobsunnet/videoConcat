@@ -126,10 +126,7 @@ class VideoEditor(QWidget):
         clips_names = [data.filename for data in clips_data_list]
 
         self.progress_bar.setVisible(True)
-        res_file_path = self._create_concat_file_path(
-            folder_path,
-            clips_names,
-            )
+        res_file_path = self._create_concat_file_path(folder_path, clips_names)
 
         worker = ConcatenatorWorker(clips_data_list,
                                     file_path=res_file_path,
@@ -151,28 +148,7 @@ class VideoEditor(QWidget):
 
     @pyqtSlot()
     def _debug_pressed(self):
-        """
-        Debug button pressed."""
-
-    def _player_status_check(self) ->bool:
-        """
-        Checks if both players have valid media status.
-
-        Checks if the media status of both players is not in the list of
-        invalid statuses.
-
-        Returns:
-            bool: True if both status are valid, False otherwise.
-        """
-        invalid_status = [QMediaPlayer.MediaStatus.LoadingMedia,
-                          QMediaPlayer.MediaStatus.InvalidMedia,
-                          QMediaPlayer.MediaStatus.NoMedia,
-                          QMediaPlayer.MediaStatus.StalledMedia]
-        bad_status = self.player.player.mediaStatus() in invalid_status
-        if bad_status:
-            return False
-
-        return True
+        """ Debug button pressed."""
 
     def _create_concat_file_path(self, folder_path:str, files_list:list[str])->str:
         """
