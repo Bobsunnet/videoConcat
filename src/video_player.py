@@ -29,8 +29,6 @@ class DropOverlay(QWidget):
 class VideoPlayer(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.filename = ''
-
         self.setContentsMargins(20, 20, 20, 40)
         self.setGeometry(10, 10, 400, 300)
         self.setStyleSheet('background-color: #99a;')
@@ -153,5 +151,4 @@ class VideoPlayer(QWidget):
 
     def connect_video_to_player(self, file_path:str):
         self.player.setSource(QUrl.fromLocalFile(file_path))
-        self.filename = file_path
         self.change_btn_play_name(True)

@@ -2,7 +2,6 @@ import os
 
 from PyQt6.QtCore import QDir, QObject, pyqtSignal, pyqtSlot, QRunnable, QThreadPool
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QFileDialog, QComboBox, QVBoxLayout
-from PyQt6.QtMultimedia import QMediaPlayer
 
 from moviepy import VideoFileClip, VideoClip
 from moviepy.video.compositing import CompositeVideoClip
