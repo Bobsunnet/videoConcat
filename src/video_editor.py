@@ -15,6 +15,14 @@ from src.TracksView import PreviewWindow
 from src import debug_manager
 
 
+class ClipContentProvider:
+    def __init__(self, clips_list: list):
+        self.clips_data_list = clips_list
+
+    def get_video_clips(self) ->list[VideoFileClip]:
+        return [VideoFileClip(clip.filename) for clip in self.clips_data_list]
+
+
 class VideoCutter:
     def __init__(self):
         self.file_edited: VideoFileClip | None = None
@@ -39,18 +47,18 @@ class ConcatenatorSignals(QObject):
 
 class ConcatenatorWorker(QRunnable):
 
-    def __init__(self, clips: list[VideoFileClip], file_path: str, method: str = 'chain'):
+    def __init__(self, clips_data_list: list, file_path: str, concat_method: str = 'chain'):
         super().__init__()
         self.video_concat: VideoClip | None = None
         self.signals = ConcatenatorSignals()
-        self.clips = clips
+        self.clips = clips_data_list
         self.file_path = file_path
-        self.method = method
+        self.concat_method = concat_method
 
     def run(self):
         try:
             self.video_concat = (CompositeVideoClip
-                             .concatenate_videoclips(self.clips, method=self.method)
+                             .concatenate_videoclips(ClipContentProvider(self.clips).get_video_clips(), method=self.concat_method)
                              .write_videofile(self.file_path, logger=WidgetProgressLogger(self.signals.progress))
                              )
         except Exception as e:
@@ -105,30 +113,28 @@ class VideoEditor(QWidget):
         self.setLayout(main_layout)
 
     def process_file(self):
-        # if not self._player_status_check():
-        #     print('No media ready for concatenation')
-        #     return
-
         folder_path = QFileDialog().getExistingDirectory(self, 'Destination Folder', QDir.currentPath())
         if folder_path == '':
             return
 
-        clip_items = [item.clip for item in self.preview_window.scene.get_items()]
+        clips_data_list = [item.clip for item in self.preview_window.scene.get_items()]
 
-        if len(clip_items) == 0:
+        if len(clips_data_list) == 0:
             print("No videos in preview window.")
             return
+
+        clips_names = [data.filename for data in clips_data_list]
 
         self.progress_bar.setVisible(True)
         res_file_path = self._create_concat_file_path(
             folder_path,
-            [clip.filename for clip in clip_items],
+            clips_names,
             )
 
-        worker = ConcatenatorWorker(clip_items,
-            file_path=res_file_path,
-            method=self.cbox_method.currentText().lower()
-        )
+        worker = ConcatenatorWorker(clips_data_list,
+                                    file_path=res_file_path,
+                                    concat_method=self.cbox_method.currentText().lower()
+                                    )
         worker.signals.progress.connect(self.progress_bar.progress_changed)
         worker.signals.finished.connect(self._processing_finished)
         worker.signals.error.connect(self.worker_error)
@@ -170,9 +176,7 @@ class VideoEditor(QWidget):
 
     def _create_concat_file_path(self, folder_path:str, files_list:list[str])->str:
         """
-        Creates a file path for concatenated video
-
-        Concatenates the names of the two files, removes the extension
+        Creates a file path for concatenated video. Concatenates the names of the two files, removes the extension
         and adds '.mp4' to the end of the new name.
 
         Args:
@@ -203,6 +207,7 @@ class VideoEditor(QWidget):
     @pyqtSlot(str)
     def worker_error(self, error:str):
         print('ERROR: %s' % error)
+        self._processing_finished()
 
 
 if __name__ == '__main__':
