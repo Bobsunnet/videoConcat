@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QUrl, Qt, QDir, QTime, pyqtSlot
+from PyQt6.QtCore import QUrl, Qt, QTime, pyqtSlot, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QSlider, QFileDialog, QLabel
@@ -24,9 +24,12 @@ class DropOverlay(QWidget):
             if isinstance(parent, VideoPlayer):
                 parent.connect_video_to_player(file_path)
                 parent.change_btn_play_name(True)
+                parent.file_dropped.emit(file_path)
 
 
 class VideoPlayer(QWidget):
+    file_dropped = pyqtSignal(str)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setContentsMargins(20, 20, 20, 40)

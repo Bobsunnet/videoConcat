@@ -1,70 +1,14 @@
 import os
 
-from PyQt6.QtCore import QDir, QObject, pyqtSignal, pyqtSlot, QRunnable, QThreadPool
+from PyQt6.QtCore import QDir, pyqtSlot, QThreadPool
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QFileDialog, QComboBox, QVBoxLayout
-
-from moviepy import VideoFileClip, VideoClip
-from moviepy.video.compositing import CompositeVideoClip
 
 from src.UI.color import ColorBackground, ColorOptions
 from src.UI.progress_bar import ProgressBar
-from src.widget_logger import WidgetProgressLogger
 from src.TracksView import PreviewWindow
 
 from src import debug_manager
-
-
-class ClipContentProvider:
-    def __init__(self, clips_list: list):
-        self.clips_data_list = clips_list
-
-    def get_video_clips(self) ->list[VideoFileClip]:
-        return [VideoFileClip(clip.filename) for clip in self.clips_data_list]
-
-
-class VideoCutter:
-    def __init__(self):
-        self.file_edited: VideoFileClip | None = None
-
-    def cut_video(self, file_path: str, start_ms: int, end_ms: int) -> VideoFileClip:
-        self.file_edited = VideoFileClip(file_path).subclipped(start_ms / 1000, end_ms / 1000)
-        return self.file_edited
-
-    def write_edited_file(self, file_name: str):
-        if self.file_edited is not None:
-            self.file_edited.write_videofile(f"{file_name}.mp4")
-        else:
-            print("No file edited")
-
-
-class ConcatenatorSignals(QObject):
-    """Signals container for ConcatenatorWorker"""
-    finished = pyqtSignal()
-    progress = pyqtSignal(int)
-    error = pyqtSignal(str)
-
-
-class ConcatenatorWorker(QRunnable):
-
-    def __init__(self, clips_data_list: list, file_path: str, concat_method: str = 'chain'):
-        super().__init__()
-        self.video_concat: VideoClip | None = None
-        self.signals = ConcatenatorSignals()
-        self.clips = clips_data_list
-        self.file_path = file_path
-        self.concat_method = concat_method
-
-    def run(self):
-        try:
-            self.video_concat = (CompositeVideoClip
-                             .concatenate_videoclips(ClipContentProvider(self.clips).get_video_clips(), method=self.concat_method)
-                             .write_videofile(self.file_path, logger=WidgetProgressLogger(self.signals.progress))
-                             )
-        except Exception as e:
-            self.signals.error.emit("ERROR "+ str(e))
-
-        else:
-            self.signals.finished.emit()
+from src.workers import ConcatenatorWorker
 
 
 class VideoEditor(QWidget):
@@ -116,7 +60,7 @@ class VideoEditor(QWidget):
         if folder_path == '':
             return
 
-        clips_data_list = [item.clip for item in self.preview_window.scene.get_items()]
+        clips_data_list = [item.clip_data for item in self.preview_window.scene.get_items()]
 
         if len(clips_data_list) == 0:
             print("No videos in preview window.")
