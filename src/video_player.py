@@ -7,8 +7,6 @@ from src import debug_manager
 
 
 class VideoPlayer(QWidget):
-    file_dropped = pyqtSignal(str)
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setContentsMargins(20, 20, 20, 40)

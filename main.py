@@ -13,14 +13,14 @@ class PreviewPlayerMediator:
     def __init__(self, preview:PreviewWindow, player:VideoPlayer):
         self.preview = preview
         self.player = player
-        self.connect_loading()
+        self.connect_preview_selection()
         self.connect_dropping()
 
-    def connect_loading(self):
+    def connect_preview_selection(self):
         self.preview.item_selected.connect(lambda clip_data: self.player.connect_video_to_player(clip_data.filename))
 
     def connect_dropping(self):
-        self.player.file_dropped.connect(self.preview.add_video_preview)
+        pass
 
 
 class MainWindow(QMainWindow):
