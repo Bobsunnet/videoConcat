@@ -3,23 +3,24 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
 
 from src.video_player import VideoPlayer
 from src.video_editor import VideoEditor
+from src.preview_window import PreviewWindow
 from src.UI.color import ColorBackground, ColorOptions
 
 from src.updater import UpdateManager
 
 
-class PreviewEditorMediator:
-    def __init__(self, editor:VideoEditor, player:VideoPlayer):
-        self.editor = editor
+class PreviewPlayerMediator:
+    def __init__(self, preview:PreviewWindow, player:VideoPlayer):
+        self.preview = preview
         self.player = player
         self.connect_loading()
         self.connect_dropping()
 
     def connect_loading(self):
-        self.editor.preview_window.item_selected.connect(lambda clip_data: self.player.connect_video_to_player(clip_data.filename))
+        self.preview.item_selected.connect(lambda clip_data: self.player.connect_video_to_player(clip_data.filename))
 
     def connect_dropping(self):
-        self.player.file_dropped.connect(self.editor.preview_window.add_video_preview)
+        self.player.file_dropped.connect(self.preview.add_video_preview)
 
 
 class MainWindow(QMainWindow):
@@ -28,8 +29,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Video Concatenator")
         self.update_manager = UpdateManager()
         self.video_player = VideoPlayer(parent=self)
-        self.editor = VideoEditor(self.video_player, parent=self)
-        self.mediator = PreviewEditorMediator(self.editor, self.video_player)
+        self.preview_window = PreviewWindow()
+        self.editor = VideoEditor(self.video_player,self.preview_window, parent=self)
+        self.mediator = PreviewPlayerMediator(self.preview_window, self.video_player)
         self.status_bar = QStatusBar(self)
         self.setStatusBar(self.status_bar)
 

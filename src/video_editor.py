@@ -5,18 +5,15 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QFileDialog, QCom
 
 from src.UI.color import ColorBackground, ColorOptions
 from src.UI.progress_bar import ProgressBar
-from src.TracksView import PreviewWindow
-
 from src import debug_manager
 from src.workers import ConcatenatorWorker
 
 
 class VideoEditor(QWidget):
-    def __init__(self, video_player, *args, **kwargs):
+    def __init__(self, video_player, preview_window, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.preview_window = PreviewWindow()
+        self.preview_window = preview_window
         self.threadpool = QThreadPool()
-        self.parent = kwargs.get('parent', None)
         self.player = video_player
         self.btn_open_file = QPushButton("Open File", parent=self)
         self.btn_open_file.clicked.connect(self.add_file_to_view)

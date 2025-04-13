@@ -6,27 +6,6 @@ from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QSli
 from src import debug_manager
 
 
-class DropOverlay(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
-        self.setAcceptDrops(True)
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.accept()
-
-    def dropEvent(self, event):
-        urls = event.mimeData().urls()
-        if urls:
-            file_path = urls[0].toLocalFile()
-            parent = self.parent()
-            if isinstance(parent, VideoPlayer):
-                parent.connect_video_to_player(file_path)
-                parent.change_btn_play_name(True)
-                parent.file_dropped.emit(file_path)
-
-
 class VideoPlayer(QWidget):
     file_dropped = pyqtSignal(str)
 
@@ -38,8 +17,6 @@ class VideoPlayer(QWidget):
 
         self.video_window = QVideoWidget(parent=self)
         self.video_window.setGeometry(10, 10, 400, 225)
-        self.drop_overlay = DropOverlay(self)
-        self.drop_overlay.setGeometry(self.video_window.geometry())
 
         self.player = QMediaPlayer(parent=self)
         self.player.setVideoOutput(self.video_window)
@@ -78,11 +55,7 @@ class VideoPlayer(QWidget):
 
         self.init_layout()
 
-    def resizeEvent(self, event):
-        self.drop_overlay.setGeometry(self.video_window.geometry())
-        super().resizeEvent(event)
-
-    def init_layout(self, debug_btn=None):
+    def init_layout(self):
         main_layout = QVBoxLayout()
         screen_layout = QVBoxLayout()
         slider_layout = QHBoxLayout()

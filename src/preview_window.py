@@ -8,6 +8,27 @@ from src.schemas import ClipData
 from src.workers import VideoDataAnalyzer
 
 
+class TracksView(QGraphicsView):
+    def __init__(self, parent:'PreviewWindow'=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+
+    def dragMoveEvent(self, event):
+        """ need to be reimplemented along with dragEnterEvent and dropEvent """
+        if event.mimeData().hasUrls():
+            event.accept()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        for url in urls:
+            file_path = url.toLocalFile()
+            self.parent().add_video_preview(file_path)
+
+
 class Scene(QGraphicsScene):
     ITEMS_ROFFSET = 2
 
@@ -73,6 +94,7 @@ class VideoPreviewItem(QGraphicsPixmapItem):
 
 class PreviewWindow(QWidget):
     item_selected = pyqtSignal(ClipData)
+    START_WIDTH = 800
 
     def __init__(self):
         super().__init__()
@@ -82,11 +104,11 @@ class PreviewWindow(QWidget):
         self.scene.selectionChanged.connect(self.on_selectionChanged)
         self.init_scene_mock()
 
-        self.track_view = QGraphicsView()
-        self.track_view.setSceneRect(0, 0, 800, 50)
+        self.track_view = TracksView(self)
+        self.track_view.setSceneRect(0, 0, self.START_WIDTH, 50)
         self.track_view.setStyleSheet('background-color: black;')
-
         self.track_view.setScene(self.scene)
+
         self.btn_debug = QPushButton('debug scene')
         self.btn_debug.clicked.connect(self.debug_pressed)
         debug_manager.register_widget(self.btn_debug)
@@ -97,11 +119,16 @@ class PreviewWindow(QWidget):
         self.setLayout(layout)
 
     def debug_pressed(self, value=None):
-        print(self.scene.get_items())
+        items = self.scene.selectedItems()
+        if items:
+            print(items[0].clip_data)
+            print()
+
+        for el in self.scene.get_items():
+            print(el.clip_data)
 
     def debug_action(self, *args):
         print('SIGNAL EMITTED')
-        print(self.scene.selectedItems())
 
     @pyqtSlot()
     def on_selectionChanged(self):
