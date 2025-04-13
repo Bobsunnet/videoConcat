@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QPushButton, QWidget,
     QGraphicsPixmapItem, QHBoxLayout, QVBoxLayout
 
 from src import debug_manager
+from src.options import DEBUG
 from src.schemas import ClipData
 from src.workers import VideoDataAnalyzer
 
@@ -169,6 +170,9 @@ class PreviewWindow(QWidget):
             self.item_selected.emit(clip_data)
 
     def init_scene_mock(self):
+        if not DEBUG:
+            return
+
         for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid_sample.avi', 'D:/PythonProjects/videoConcat/video/vid2.mp4']):
             self.add_video_preview(file_path)
 
