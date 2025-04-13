@@ -79,7 +79,6 @@ class VideoPlayer(QWidget):
 
     def _debug_action(self, value=None):
         """"""
-        print(self.player.mediaStatus())
 
     def play_pressed(self):
         playing = self.player.isPlaying()

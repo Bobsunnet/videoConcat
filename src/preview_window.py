@@ -45,6 +45,9 @@ class Scene(QGraphicsScene):
 
 
 class VideoPreviewItem(QGraphicsPixmapItem):
+    DEFAULT_Z_VALUE = 0
+    SELECTED_Z_VALUE = 1
+
     def __init__(self, pixmap: QPixmap, scene: Scene, init_pos: QPointF, clip: ClipData):
         super().__init__(pixmap)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
@@ -81,6 +84,12 @@ class VideoPreviewItem(QGraphicsPixmapItem):
             if value.x() < 0:
                 x = 0
             self.setPos(x, 0)
+
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
+            if value: # value is 1 if item was selected and 0 if it was unselected
+                self.setZValue(self.SELECTED_Z_VALUE)
+            else:
+                self.setZValue(self.DEFAULT_Z_VALUE)
 
         return super().itemChange(change, value)
 
@@ -121,11 +130,8 @@ class PreviewWindow(QWidget):
     def debug_pressed(self, value=None):
         items = self.scene.selectedItems()
         if items:
-            print(items[0].clip_data)
-            print()
-
-        for el in self.scene.get_items():
-            print(el.clip_data)
+            selected_item = items[0]
+            self.scene.removeItem(selected_item)
 
     def debug_action(self, *args):
         print('SIGNAL EMITTED')
