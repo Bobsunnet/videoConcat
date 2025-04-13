@@ -1,7 +1,7 @@
 from PyQt6.QtCore import QPointF, QThreadPool, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QPushButton, QWidget, QGraphicsItem, \
-    QGraphicsPixmapItem, QHBoxLayout
+    QGraphicsPixmapItem, QHBoxLayout, QVBoxLayout
 
 from src import debug_manager
 from src.schemas import ClipData
@@ -42,6 +42,19 @@ class Scene(QGraphicsScene):
         Used to keep the order of video previews in the correct order when the user moves them.
         """
         return sorted(self.items(), key=lambda item: item.x())
+
+    def remove_field_gaps(self):
+        """
+        Shifts all items in the scene to the left, removing any gaps between them.
+
+        Used when the user removes a preview item from the scene.
+        """
+        items = self.get_items()
+        if items:
+            pos_x = self.ITEMS_ROFFSET
+            for item in items:
+                item.update_position(QPointF(pos_x, 0))
+                pos_x += item.sceneBoundingRect().width()
 
 
 class VideoPreviewItem(QGraphicsPixmapItem):
@@ -118,23 +131,35 @@ class PreviewWindow(QWidget):
         self.track_view.setStyleSheet('background-color: black;')
         self.track_view.setScene(self.scene)
 
-        self.btn_debug = QPushButton('debug scene')
+        self.btn_debug = QPushButton('DEBUG_scene')
         self.btn_debug.clicked.connect(self.debug_pressed)
+
+        self.btn_delete_selected = QPushButton('Remove')
+        self.btn_delete_selected.clicked.connect(self.on_remove_selected)
+
         debug_manager.register_widget(self.btn_debug)
 
         layout = QHBoxLayout()
-        layout.addWidget(self.btn_debug)
+        btn_layout = QVBoxLayout()
+        btn_layout.addWidget(self.btn_debug)
+        btn_layout.addWidget(self.btn_delete_selected)
+        layout.addLayout(btn_layout)
         layout.addWidget(self.track_view)
         self.setLayout(layout)
 
     def debug_pressed(self, value=None):
+        print(self.scene.get_items())
+
+    def debug_action(self, *args):
+        print('SIGNAL EMITTED')
+
+    @pyqtSlot()
+    def on_remove_selected(self):
         items = self.scene.selectedItems()
         if items:
             selected_item = items[0]
             self.scene.removeItem(selected_item)
-
-    def debug_action(self, *args):
-        print('SIGNAL EMITTED')
+            self.scene.remove_field_gaps()
 
     @pyqtSlot()
     def on_selectionChanged(self):
