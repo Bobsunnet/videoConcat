@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QPushButton, QWidget,
 
 from src import debug_manager
 from src.options import DEBUG
-from src.schemas import ClipData
+from src.schemas import ClipMetaData
 from src.workers import VideoDataAnalyzer
 
 
@@ -62,14 +62,14 @@ class VideoPreviewItem(QGraphicsPixmapItem):
     DEFAULT_Z_VALUE = 0
     SELECTED_Z_VALUE = 1
 
-    def __init__(self, pixmap: QPixmap, scene: Scene, init_pos: QPointF, clip: ClipData):
+    def __init__(self, pixmap: QPixmap, scene: Scene, init_pos: QPointF, clip: ClipMetaData):
         super().__init__(pixmap)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.scene = scene
         self.prev_pos = init_pos
-        self.clip_data = ClipData(clip.filename)
+        self.clip_data = ClipMetaData(clip.filename)
         self.setPos(init_pos)
 
     def _change_order(self, proposed_pos: QPointF):
@@ -116,19 +116,21 @@ class VideoPreviewItem(QGraphicsPixmapItem):
 
 
 class PreviewWindow(QWidget):
-    item_selected = pyqtSignal(ClipData)
-    START_WIDTH = 800
+    item_selected = pyqtSignal(ClipMetaData)
+    TRACK_VIEW_WIDTH = 800
+    TRACK_VIEW_HEIGHT = 40
 
     def __init__(self):
         super().__init__()
 
         self.threadpool = QThreadPool()
         self.scene = Scene()
+        self.pixels_per_second = 10
         self.scene.selectionChanged.connect(self.on_selectionChanged)
         self.init_scene_mock()
 
         self.track_view = TracksView(self)
-        self.track_view.setSceneRect(0, 0, self.START_WIDTH, 50)
+        self.track_view.setSceneRect(0, 0, self.TRACK_VIEW_WIDTH, self.TRACK_VIEW_HEIGHT)
         self.track_view.setStyleSheet('background-color: black;')
         self.track_view.setScene(self.scene)
 
@@ -173,10 +175,10 @@ class PreviewWindow(QWidget):
         if not DEBUG:
             return
 
-        for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid_sample.avi', 'D:/PythonProjects/videoConcat/video/vid2.mp4']):
+        for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid2.mp4', 'D:/PythonProjects/videoConcat/video/video_h1.mp4']):
             self.add_video_preview(file_path)
 
-    def _find_pos_x(self):
+    def _find_last_pos_x(self):
         items_list = self.scene.get_items()
         pos_x = self.scene.ITEMS_ROFFSET
         if items_list:
@@ -184,11 +186,11 @@ class PreviewWindow(QWidget):
 
         return pos_x
 
-    def on_analysis_ready(self, clip_data: ClipData):
+    def on_analysis_ready(self, clip_data: ClipMetaData):
         preview_item = VideoPreviewItem(
-            clip_data.preview_small.scaled(100, 50),
+            clip_data.preview_large.scaled(clip_data.duration_in_px, self.TRACK_VIEW_HEIGHT),
             self.scene,
-            QPointF(self._find_pos_x(), 0),
+            QPointF(self._find_last_pos_x(), 0),
             clip_data,
         )
         self.scene.addItem(preview_item)
@@ -197,7 +199,9 @@ class PreviewWindow(QWidget):
         print(error)
 
     def add_video_preview(self, file_path: str):
-        worker = VideoDataAnalyzer(file_path)
+        worker = VideoDataAnalyzer(file_path,
+                                   px_per_sec=self.pixels_per_second,
+                                   preview_frame_height=self.TRACK_VIEW_HEIGHT)
         worker.signals.finished.connect(self.on_analysis_ready)
         worker.signals.error.connect(self.on_analysis_error)
         self.threadpool.start(worker)

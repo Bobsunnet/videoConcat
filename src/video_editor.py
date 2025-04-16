@@ -57,7 +57,7 @@ class VideoEditor(QWidget):
         if folder_path == '':
             return
 
-        clips_data_list = [item.clip_data for item in self.preview_window.scene.get_items()]
+        clips_data_list = [item.clip_metadata for item in self.preview_window.scene.get_items()]
 
         if len(clips_data_list) == 0:
             print("No videos in preview window.")
