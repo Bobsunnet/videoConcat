@@ -20,7 +20,7 @@ class StoryboardCreator:
             if i == len(time_marks) - 1:
                 h, w, _ = frame.shape
                 new_w = int(w*last_frame_percentage)
-                new_w -= new_w % 4
+                new_w -= new_w % 4  # align to 4 because of QPixmap.fromImage() cant handle non aligned array
                 frame = frame[:, :new_w, :]
             frames.append(frame)
         return frames
@@ -80,7 +80,7 @@ class VideoDataAnalyzer(QRunnable):
         try:
             clip = VideoFileClip(self.clip_metadata.filename)
             self.scan_metadata(clip)
-            # clip = clip.resized(width=self.scaled_frame_width, height=self.scaled_frame_height)
+            clip = clip.resized(height=self.scaled_frame_height)
             preview_data = self.generate_preview(clip)
 
             # ______________TEMP_______________________________
@@ -99,7 +99,6 @@ class VideoDataAnalyzer(QRunnable):
 
 def _frame_to_pixmap(frame: np.ndarray):
     h, w, ch = frame.shape
-    print(h, w)
-    frame = np.ascontiguousarray(frame)
+    # frame = np.ascontiguousarray(frame)
     image = QImage(frame.tobytes(), w, h, QImage.Format.Format_RGB888)
     return QPixmap.fromImage(image)

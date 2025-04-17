@@ -51,7 +51,7 @@ class MainWindow(QMainWindow):
         video_player_background.setLayout(video_layout)
 
         editor_background = ColorBackground(ColorOptions.darkish_lighter)
-        editor_background.setMaximumHeight(180)
+        editor_background.setMaximumHeight(200)
 
         editor_layout = QHBoxLayout()
         editor_layout.addWidget(self.editor)

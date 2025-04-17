@@ -1,9 +1,10 @@
-from PyQt6.QtCore import QPointF, QThreadPool, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QPointF, QThreadPool, pyqtSignal, pyqtSlot, Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QPushButton, QWidget, QGraphicsItem, \
     QGraphicsPixmapItem, QHBoxLayout, QVBoxLayout
 
 from src import debug_manager
+from src.UI.color import ColorOptions
 from src.options import DEBUG
 from src.schemas import ClipMetaData
 from src.workers import VideoDataAnalyzer
@@ -13,6 +14,8 @@ class TracksView(QGraphicsView):
     def __init__(self, parent:'PreviewWindow'=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -28,6 +31,12 @@ class TracksView(QGraphicsView):
         for url in urls:
             file_path = url.toLocalFile()
             self.parent().add_video_preview(file_path)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+
+        width = max(self.sceneRect().width(), self.width())
+        self.setSceneRect(0, 0, width, self.height())
 
 
 class Scene(QGraphicsScene):
@@ -97,7 +106,9 @@ class VideoPreviewItem(QGraphicsPixmapItem):
             x = value.x()
             if value.x() < 0:
                 x = 0
-            self.setPos(x, 0)
+
+            y = self.pixmap().height() // 2
+            self.setPos(x,y)
 
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
             if value: # value is 1 if item was selected and 0 if it was unselected
@@ -117,8 +128,7 @@ class VideoPreviewItem(QGraphicsPixmapItem):
 
 class PreviewWindow(QWidget):
     item_selected = pyqtSignal(ClipMetaData)
-    TRACK_VIEW_WIDTH = 800
-    TRACK_VIEW_HEIGHT = 40
+    TRACK_VIEW_HEIGHT = 41
 
     def __init__(self):
         super().__init__()
@@ -126,12 +136,13 @@ class PreviewWindow(QWidget):
         self.threadpool = QThreadPool()
         self.scene = Scene()
         self.pixels_per_second = 10
+        self.start_width = 800
         self.scene.selectionChanged.connect(self.on_selectionChanged)
         self.init_scene_mock()
 
         self.track_view = TracksView(self)
-        self.track_view.setSceneRect(0, 0, self.TRACK_VIEW_WIDTH, self.TRACK_VIEW_HEIGHT)
-        self.track_view.setStyleSheet('background-color: black;')
+        # self.track_view.setSceneRect(0, 0, self.start_width, self.TRACK_VIEW_HEIGHT)
+        self.track_view.setStyleSheet(f'background-color: {ColorOptions.dimmer};')
         self.track_view.setScene(self.scene)
 
         self.btn_debug = QPushButton('DEBUG_scene')
@@ -175,7 +186,7 @@ class PreviewWindow(QWidget):
         if not DEBUG:
             return
 
-        for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid2.mp4', 'D:/PythonProjects/videoConcat/video/video_h1.mp4']):
+        for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid2.mp4', 'D:/PythonProjects/videoConcat/video/video_valera.mp4']):
             self.add_video_preview(file_path)
 
     def _find_last_pos_x(self):

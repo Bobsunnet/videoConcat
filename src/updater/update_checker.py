@@ -18,7 +18,7 @@ class UpdateManager(QWidget):
         try:
             res = requests.get('https://api.github.com/repos/Bobsunnet/videoConcat/releases/latest')
             if res.status_code != 200:
-                QMessageBox.warning(self, "Error", "Failed to check for updates")
+                QMessageBox.warning(self, "Error", "Failed to check for updates. GitHub is not responding")
                 return
 
             if res.json()['tag_name'] > VERSION:

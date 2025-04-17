@@ -5,11 +5,9 @@ from src import WidgetProgressLogger
 
 
 class ClipContentProvider:
-    def __init__(self, clips_list: list):
-        self.clips_data_list = clips_list
-
-    def get_video_clips(self) ->list[VideoFileClip]:
-        return [VideoFileClip(clip.filename) for clip in self.clips_data_list]
+    @staticmethod
+    def create_video_clips(clips_metadata_list:list) ->list[VideoFileClip]:
+        return [VideoFileClip(clip.filename) for clip in clips_metadata_list]
 
 
 class ConcatenatorSignals(QObject):
@@ -31,7 +29,7 @@ class ConcatenatorWorker(QRunnable):
     def run(self):
         try:
             self.video_concat = (CompositeVideoClip
-                             .concatenate_videoclips(ClipContentProvider(self.clips).get_video_clips(), method=self.concat_method)
+                             .concatenate_videoclips(ClipContentProvider.create_video_clips(self.clips), method=self.concat_method)
                              .write_videofile(self.file_path, logger=WidgetProgressLogger(self.signals.progress))
                              )
         except Exception as e:

@@ -124,4 +124,6 @@ class VideoPlayer(QWidget):
 
     def connect_video_to_player(self, file_path:str):
         self.player.setSource(QUrl.fromLocalFile(file_path))
+        self.player.setPosition(0)
+        self.player.pause()
         self.change_btn_play_name(True)
