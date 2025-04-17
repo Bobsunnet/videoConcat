@@ -128,6 +128,7 @@ class VideoPreviewItem(QGraphicsPixmapItem):
 
 class PreviewWindow(QWidget):
     item_selected = pyqtSignal(ClipMetaData)
+    item_removed = pyqtSignal(ClipMetaData)
     TRACK_VIEW_HEIGHT = 41
 
     def __init__(self):
@@ -145,18 +146,14 @@ class PreviewWindow(QWidget):
         self.track_view.setStyleSheet(f'background-color: {ColorOptions.dimmer};')
         self.track_view.setScene(self.scene)
 
-        self.btn_debug = QPushButton('DEBUG_scene')
+        self.btn_debug = QPushButton('DBG_scn')
         self.btn_debug.clicked.connect(self.debug_pressed)
-
-        self.btn_delete_selected = QPushButton('Remove')
-        self.btn_delete_selected.clicked.connect(self.on_remove_selected)
 
         debug_manager.register_widget(self.btn_debug)
 
         layout = QHBoxLayout()
         btn_layout = QVBoxLayout()
         btn_layout.addWidget(self.btn_debug)
-        btn_layout.addWidget(self.btn_delete_selected)
         layout.addLayout(btn_layout)
         layout.addWidget(self.track_view)
         self.setLayout(layout)
@@ -169,18 +166,19 @@ class PreviewWindow(QWidget):
 
     @pyqtSlot()
     def on_remove_selected(self):
-        items = self.scene.selectedItems()
+        items:list[VideoPreviewItem] = self.scene.selectedItems()
         if items:
             selected_item = items[0]
             self.scene.removeItem(selected_item)
             self.scene.remove_field_gaps()
+            self.item_removed.emit(selected_item.clip_data)
+            print(selected_item.clip_data.filename)
 
     @pyqtSlot()
     def on_selectionChanged(self):
         selected_items = self.scene.selectedItems()
         if selected_items:
-            clip_data = selected_items[0].clip_data
-            self.item_selected.emit(clip_data)
+            self.item_selected.emit(selected_items[0].clip_data)
 
     def init_scene_mock(self):
         if not DEBUG:
@@ -216,6 +214,12 @@ class PreviewWindow(QWidget):
         worker.signals.finished.connect(self.on_analysis_ready)
         worker.signals.error.connect(self.on_analysis_error)
         self.threadpool.start(worker)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Delete:
+            self.on_remove_selected()
+        else:
+            super().keyPressEvent(event)
 
 
 if __name__ == '__main__':

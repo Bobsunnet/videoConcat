@@ -12,15 +12,19 @@ from src.updater import UpdateManager
 class PreviewPlayerMediator:
     def __init__(self, preview:PreviewWindow, player:VideoPlayer):
         self.preview = preview
-        self.player = player
+        self.video_player = player
         self.connect_preview_selection()
-        self.connect_dropping()
+        self.connect_item_removed()
 
     def connect_preview_selection(self):
-        self.preview.item_selected.connect(lambda clip_data: self.player.connect_video_to_player(clip_data.filename))
+        self.preview.item_selected.connect(lambda clip_data: self.video_player.connect_video_to_player(clip_data.filename))
 
-    def connect_dropping(self):
-        pass
+    def connect_item_removed(self):
+        self.preview.item_removed.connect(self.stop_video_playing)
+
+    def stop_video_playing(self, clip_data):
+        if clip_data.filename == self.video_player.player.source().toString().split('///')[-1]:
+            self.video_player.stop_pressed()
 
 
 class MainWindow(QMainWindow):
