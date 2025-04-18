@@ -11,11 +11,12 @@ from src.workers import VideoDataAnalyzer
 
 
 class TracksView(QGraphicsView):
-    def __init__(self, parent:'PreviewWindow'=None):
+    def __init__(self, parent: 'PreviewWindow' = None):
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -32,12 +33,6 @@ class TracksView(QGraphicsView):
             file_path = url.toLocalFile()
             self.parent().add_video_preview(file_path)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-
-        width = max(self.sceneRect().width(), self.width())
-        self.setSceneRect(0, 0, width, self.height())
-
 
 class Scene(QGraphicsScene):
     ITEMS_ROFFSET = 2
@@ -45,7 +40,7 @@ class Scene(QGraphicsScene):
     def __init__(self):
         super().__init__()
 
-    def get_items(self) ->list:
+    def get_items(self) -> list:
         """
         Returns the list of VideoPreviewItem items sorted by their x position.
 
@@ -108,10 +103,10 @@ class VideoPreviewItem(QGraphicsPixmapItem):
                 x = 0
 
             y = self.pixmap().height() // 2
-            self.setPos(x,y)
+            self.setPos(x, y)
 
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
-            if value: # value is 1 if item was selected and 0 if it was unselected
+            if value:  # value is 1 if item was selected and 0 if it was unselected
                 self.setZValue(self.SELECTED_Z_VALUE)
             else:
                 self.setZValue(self.DEFAULT_Z_VALUE)
@@ -129,22 +124,23 @@ class VideoPreviewItem(QGraphicsPixmapItem):
 class PreviewWindow(QWidget):
     item_selected = pyqtSignal(ClipMetaData)
     item_removed = pyqtSignal(ClipMetaData)
-    TRACK_VIEW_HEIGHT = 41
+    TRACK_VIEW_HEIGHT = 43
+    MAX_PX_PER_SEC = 100
+    ZOOM_VARIANTS = [0.05,0.1, 0.2, 0.4, 0.7, 1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10, 15, 20, 30]
 
     def __init__(self):
         super().__init__()
 
         self.threadpool = QThreadPool()
         self.scene = Scene()
-        self.pixels_per_second = 10
-        self.start_width = 800
+        self.pixels_per_second = 10 # frames per sec = 10[px/sec] / 70 [px] =0.1428 frames per sec
         self.scene.selectionChanged.connect(self.on_selectionChanged)
         self.init_scene_mock()
 
         self.track_view = TracksView(self)
-        # self.track_view.setSceneRect(0, 0, self.start_width, self.TRACK_VIEW_HEIGHT)
         self.track_view.setStyleSheet(f'background-color: {ColorOptions.dimmer};')
         self.track_view.setScene(self.scene)
+        self.scene.setSceneRect(0, 0, self.track_view.width(), self.track_view.height())
 
         self.btn_debug = QPushButton('DBG_scn')
         self.btn_debug.clicked.connect(self.debug_pressed)
@@ -160,19 +156,21 @@ class PreviewWindow(QWidget):
 
     def debug_pressed(self, value=None):
         print(self.scene.get_items())
+        self.add_video_track('D:/PythonProjects/videoConcat/video/vid_sample.avi')
 
     def debug_action(self, *args):
         print('SIGNAL EMITTED')
 
     @pyqtSlot()
     def on_remove_selected(self):
-        items:list[VideoPreviewItem] = self.scene.selectedItems()
+        items: list[VideoPreviewItem] = self.scene.selectedItems()
         if items:
             selected_item = items[0]
             self.scene.removeItem(selected_item)
             self.scene.remove_field_gaps()
             self.item_removed.emit(selected_item.clip_data)
-            print(selected_item.clip_data.filename)
+            # selected_item.deleteLater()
+        self.update_scene_rect()
 
     @pyqtSlot()
     def on_selectionChanged(self):
@@ -184,8 +182,9 @@ class PreviewWindow(QWidget):
         if not DEBUG:
             return
 
-        for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid2.mp4', 'D:/PythonProjects/videoConcat/video/video_valera.mp4']):
-            self.add_video_preview(file_path)
+        for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid2.mp4',
+                                       'D:/PythonProjects/videoConcat/video/video_v1.mp4', ]):
+            self.add_video_track(file_path)
 
     def _find_last_pos_x(self):
         items_list = self.scene.get_items()
@@ -195,19 +194,22 @@ class PreviewWindow(QWidget):
 
         return pos_x
 
+    def create_preview_item(self, clip_data: ClipMetaData):
+        scaled_pixmap = clip_data.preview_large.scaled(clip_data.duration_in_px, self.TRACK_VIEW_HEIGHT)
+        position = QPointF(self._find_last_pos_x(), 0)
+        return VideoPreviewItem(scaled_pixmap, self.scene, position, clip_data)
+
+    def add_preview_item(self, clip_data: ClipMetaData):
+        self.scene.addItem(self.create_preview_item(clip_data))
+        self.update_scene_rect()
+
     def on_analysis_ready(self, clip_data: ClipMetaData):
-        preview_item = VideoPreviewItem(
-            clip_data.preview_large.scaled(clip_data.duration_in_px, self.TRACK_VIEW_HEIGHT),
-            self.scene,
-            QPointF(self._find_last_pos_x(), 0),
-            clip_data,
-        )
-        self.scene.addItem(preview_item)
+        self.add_preview_item(clip_data)
 
     def on_analysis_error(self, error: str):
         print(error)
 
-    def add_video_preview(self, file_path: str):
+    def add_video_track(self, file_path: str):
         worker = VideoDataAnalyzer(file_path,
                                    px_per_sec=self.pixels_per_second,
                                    preview_frame_height=self.TRACK_VIEW_HEIGHT)
@@ -220,6 +222,13 @@ class PreviewWindow(QWidget):
             self.on_remove_selected()
         else:
             super().keyPressEvent(event)
+
+    def update_scene_rect(self):
+        if self.scene.items():
+            bounding_rect = self.scene.itemsBoundingRect()
+            self.scene.setSceneRect(bounding_rect)
+        else:
+            self.scene.setSceneRect(0, 0, self.track_view.width(), self.TRACK_VIEW_HEIGHT)
 
 
 if __name__ == '__main__':
