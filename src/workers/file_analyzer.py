@@ -1,10 +1,8 @@
 import io
 import subprocess
-from math import trunc
 
 import numpy as np
 import imageio_ffmpeg
-import imageio.v3 as iio
 
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable
 from PyQt6.QtGui import QImage, QPixmap
@@ -17,93 +15,75 @@ from src.schemas import PreviewData
 
 class StoryboardCreator:
 
-    def extract_frames_from_pipe(self, video_path: str, time_step:float, width: int, height: int):
+    def extract_frames_from_pipe(self, video_path: str, time_step: float, width: int, height: int):
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
         command = [
             ffmpeg_path,
-        "-i", video_path,
-        "-vf", f"fps=1/{time_step}",
-        "-s", f"{width}x{height}",
-        "-f", "image2pipe",
-        "-vcodec", "png",
-        "-"]
+            "-i", video_path,
+            "-vf", f"fps=1/{time_step}",
+            "-s", f"{width}x{height}",
+            "-f", "image2pipe",
+            "-vcodec", "png",
+            "-"]
 
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         buffer = b''
         start_marker = b'\x89PNG\r\n\x1a\n'
         end_marker = b'IEND\xaeB`\x82'
+        chunk_size = 65536
 
         while True:
             try:
-                # Читаем кусок данных
-                chunk = proc.stdout.read(8192*8)
+                chunk = proc.stdout.read(chunk_size)
                 if not chunk:
                     break
 
                 buffer += chunk
 
-                # Ищем начало и конец PNG-файла
                 while True:
-                    start_pos = buffer.find(start_marker)
-                    if start_pos == -1:
+                    start_idx = buffer.find(start_marker)
+                    if start_idx == -1:
                         break
 
-                    end_pos = buffer.find(end_marker, start_pos)
-                    if end_pos == -1:
+                    end_idx = buffer.find(end_marker)
+                    if end_idx == -1:
                         break
 
-                    # Извлекаем полное изображение
-                    image_data = buffer[start_pos:end_pos + 8]
-                    buffer = buffer[end_pos + 8:]
-
-                    # Преобразуем в изображение
-                    img = Image.open(io.BytesIO(image_data))
-                    yield np.array(img)
+                    img_data_bytes = buffer[start_idx:end_idx + 8]
+                    buffer = buffer[end_idx + 8:]
+                    img = Image.open(io.BytesIO(img_data_bytes))
+                    yield img
 
             except Exception as e:
                 print(e)
 
         proc.terminate()
 
-    def _ffmpeg_extract_frames(self, video_path: str, time_step:float, width: int, height: int):
-        frames = []
-        for frame in self.extract_frames_from_pipe(video_path, time_step, width, height):
-            frames.append(np.array(frame))
-
-
+    def _ffmpeg_extract_frames(self, video_path: str, time_step: float, width: int, height: int,
+                               last_frame_percentage: float):
+        frames = [np.array(frame) for frame in self.extract_frames_from_pipe(video_path, time_step, width, height)]
+        last_frame = self._truncate_frame(frames[-1], last_frame_percentage)
+        frames[-1] = last_frame
         return frames
 
-    def extract_storyboard_frames(self,
-                                  video_clip: VideoFileClip,
-                                  time_marks: list[float],
-                                  last_frame_percentage: float) -> list[np.ndarray]:
-        """ """
-        frames: list[np.ndarray] = []
-        for i, time_mark in enumerate(time_marks):
-            frame = video_clip.get_frame(time_mark)
-            with open(f'i_{i}.png', 'wb') as f:
-                f.write(frame)
-            if i == len(time_marks) - 1:
-                h, w, _ = frame.shape
-                new_w = int(w*last_frame_percentage)
-                aligned_new_w = self._align_width_to_4(new_w)  # align to 4 because of QPixmap.fromImage() cant handle non aligned array
-                frame = frame[:, :aligned_new_w, :]
-            frames.append(frame)
-        return frames
-
-    @staticmethod
-    def _align_width_to_4(value: int) -> int:
-        return value - value % 4
+    def _truncate_frame(self, frame, last_frame_percentage) -> np.ndarray:
+        h, w, _ = frame.shape
+        new_w = int(w * last_frame_percentage)
+        new_w -= new_w % 4
+        return frame[:, :new_w, :]
 
     def generate_preview_data(self,
                               video_file_clip: VideoFileClip,
-                              time_marks:list[float],
-                              last_frame_percentage:float) ->PreviewData:
+                              time_step: float,
+                              last_frame_percentage: float) -> PreviewData:
         # frames_list = self.extract_storyboard_frames(video_file_clip, time_marks, last_frame_percentage)
 
         frames_list = self._ffmpeg_extract_frames(video_file_clip.filename,
-                                                  time_marks[1], width=72, height=40
+                                                  time_step,
+                                                  width=72,
+                                                  height=40,
+                                                  last_frame_percentage=last_frame_percentage
                                                   )
         preview_data = PreviewData()
         preview_data.preview = _frame_to_pixmap(frames_list[0])
@@ -146,14 +126,19 @@ class VideoDataAnalyzer(QRunnable):
 
         return time_marks
 
-    def generate_preview(self, video_file_clip:VideoFileClip):
+    def generate_preview(self, video_file_clip: VideoFileClip):
         preview_creator = StoryboardCreator()
-        last_frame_width = int(self.duration_in_px % self.scaled_frame_width)  #675 % 88 = 59
+        last_frame_width = int(self.duration_in_px % self.scaled_frame_width)  # 675 % 88 = 59
         last_frame_percentage = last_frame_width / self.scaled_frame_width  # 0.6704
-        time_marks = self._create_time_marks()
+        time_step = self.scaled_frame_width / self.px_per_sec
+        # ________________ TEMP ___________________________
+        if time_step > self.clip_metadata.duration_s:
+            time_step = self.clip_metadata.duration_s
 
-        return preview_creator.generate_preview_data(video_file_clip, time_marks, last_frame_percentage)
+        # TODO: доделать
 
+        print(time_step)
+        return preview_creator.generate_preview_data(video_file_clip, time_step, last_frame_percentage)
 
     def run(self):
         try:

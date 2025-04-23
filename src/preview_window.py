@@ -1,7 +1,7 @@
 from PyQt6.QtCore import QPointF, QThreadPool, pyqtSignal, pyqtSlot, Qt
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QColor
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QPushButton, QWidget, QGraphicsItem, \
-    QGraphicsPixmapItem, QHBoxLayout, QVBoxLayout
+    QGraphicsPixmapItem, QHBoxLayout, QVBoxLayout, QGraphicsLineItem, QGraphicsItemGroup, QGraphicsTextItem
 
 from src import debug_manager
 from src.UI.color import ColorOptions
@@ -34,11 +34,31 @@ class TracksView(QGraphicsView):
             self.parent().add_video_preview(file_path)
 
 
+class TimelineTickItem(QGraphicsLineItem):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setPen(QColor(240, 0, 55))
+        self.setZValue(1)
+
+
 class Scene(QGraphicsScene):
     ITEMS_ROFFSET = 2
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    def __init__(self):
-        super().__init__()
+        self.previews_items = []
+
+    def addItem(self, item):
+        if isinstance(item, VideoPreviewItem):
+            self.previews_items.append(item)
+
+        super().addItem(item)
+
+    def removeItem(self, item):
+        if isinstance(item, VideoPreviewItem):
+            self.previews_items.remove(item) # todo: get rid of this. Bug prone code
+
+        super().removeItem(item)
 
     def get_items(self) -> list:
         """
@@ -46,7 +66,7 @@ class Scene(QGraphicsScene):
 
         Used to keep the order of video previews in the correct order when the user moves them.
         """
-        return sorted(self.items(), key=lambda item: item.x())
+        return sorted(self.previews_items, key=lambda item: item.x())
 
     def remove_field_gaps(self):
         """
@@ -124,18 +144,25 @@ class VideoPreviewItem(QGraphicsPixmapItem):
 class PreviewWindow(QWidget):
     item_selected = pyqtSignal(ClipMetaData)
     item_removed = pyqtSignal(ClipMetaData)
-    TRACK_VIEW_HEIGHT = 43
+    TRACK_VIEW_HEIGHT = 40
     MAX_PX_PER_SEC = 100
-    ZOOM_VARIANTS = [0.05,0.1, 0.2, 0.4, 0.7, 1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10, 15, 20, 30]
+    ZOOM_VARIANTS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 20, 30, 50, 100]
 
     def __init__(self):
         super().__init__()
 
         self.threadpool = QThreadPool()
         self.scene = Scene()
+        self.clips_previews = []
         self.pixels_per_second = 10 # frames per sec = 10[px/sec] / 70 [px] =0.1428 frames per sec
         self.scene.selectionChanged.connect(self.on_selectionChanged)
+        self.grpTicks = QGraphicsItemGroup()
+        self.grpLabels = QGraphicsItemGroup()
+        self.scene.addItem(self.grpTicks)
+        self.scene.addItem(self.grpLabels)
+
         self.init_scene_mock()
+        self.draw_time_line()
 
         self.track_view = TracksView(self)
         self.track_view.setStyleSheet(f'background-color: {ColorOptions.dimmer};')
@@ -145,18 +172,25 @@ class PreviewWindow(QWidget):
         self.btn_debug = QPushButton('DBG_scn')
         self.btn_debug.clicked.connect(self.debug_pressed)
 
+        self.btn_zoom_in = QPushButton("+")
+        self.btn_zoom_in.clicked.connect(self.zoom_in)
+        self.btn_zoom_out = QPushButton("-")
+        self.btn_zoom_out.clicked.connect(self.zoom_out)
+
         debug_manager.register_widget(self.btn_debug)
 
         layout = QHBoxLayout()
         btn_layout = QVBoxLayout()
         btn_layout.addWidget(self.btn_debug)
+        btn_layout.addWidget(self.btn_zoom_in)
+        btn_layout.addWidget(self.btn_zoom_out)
         layout.addLayout(btn_layout)
         layout.addWidget(self.track_view)
         self.setLayout(layout)
 
     def debug_pressed(self, value=None):
-        print(self.scene.get_items())
-        self.add_video_track('D:/PythonProjects/videoConcat/video/vid_sample.avi')
+        print(self.grpLabels.childItems()[1].pos())
+        print(self.grpTicks.childItems()[1].pos())
 
     def debug_action(self, *args):
         print('SIGNAL EMITTED')
@@ -200,7 +234,8 @@ class PreviewWindow(QWidget):
         return VideoPreviewItem(scaled_pixmap, self.scene, position, clip_data)
 
     def add_preview_item(self, clip_data: ClipMetaData):
-        self.scene.addItem(self.create_preview_item(clip_data))
+        preview = self.create_preview_item(clip_data)
+        self.scene.addItem(preview)
         self.update_scene_rect()
 
     def on_analysis_ready(self, clip_data: ClipMetaData):
@@ -229,6 +264,64 @@ class PreviewWindow(QWidget):
             self.scene.setSceneRect(bounding_rect)
         else:
             self.scene.setSceneRect(0, 0, self.track_view.width(), self.TRACK_VIEW_HEIGHT)
+
+    # _________________ PORTED _____________________
+    def _calc_timeline_width(self) ->int:
+        width = self.scene.sceneRect().width()
+        return int(width if width > 100*self.pixels_per_second else 100*self.pixels_per_second)
+
+    def draw_time_line(self):
+        self.grpLabels.setPos(0, 0)
+        self.grpTicks.setPos(0, 0)
+        self.draw_scale()
+        self.draw_labels()
+        self.grpLabels.setPos(0, -38)
+        self.grpTicks.setPos(0, -38)
+
+    def draw_scale(self):
+        for el in self.grpTicks.childItems():
+            self.scene.removeItem(el)
+
+        for px in range(0, self._calc_timeline_width(), 10):
+            tick_height = 10
+            if px%(5*10) == 0:
+                tick_height = 20
+
+            tick = TimelineTickItem(px, 0, px, tick_height)
+            self.grpTicks.addToGroup(tick)
+
+    def draw_labels(self):
+        for el in self.grpLabels.childItems():
+            self.scene.removeItem(el)
+
+        label_tick_height = 20
+        step_px = 50
+        for px in range(step_px, self._calc_timeline_width(), step_px):
+            label = QGraphicsTextItem(str(round(px/self.pixels_per_second, 1)))
+            label.setPos(px - 10, label_tick_height)
+            self.grpLabels.addToGroup(label)
+
+    def zoom_in(self):
+        zoom_idx = self.ZOOM_VARIANTS.index(self.pixels_per_second)
+        if zoom_idx == len(self.ZOOM_VARIANTS) - 1:
+            return
+
+        self.pixels_per_second = self.ZOOM_VARIANTS[zoom_idx + 1]
+        self.draw_time_line()
+        self.change_preview_size()
+
+    def zoom_out(self):
+        zoom_idx = self.ZOOM_VARIANTS.index(self.pixels_per_second)
+        if zoom_idx == 0:
+            return
+
+        self.pixels_per_second = self.ZOOM_VARIANTS[zoom_idx - 1]
+        self.draw_time_line()
+        self.change_preview_size()
+
+    def change_preview_size(self):
+        pass
+
 
 
 if __name__ == '__main__':
