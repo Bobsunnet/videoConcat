@@ -43,6 +43,7 @@ class TimelineTickItem(QGraphicsLineItem):
 
 class Scene(QGraphicsScene):
     ITEMS_ROFFSET = 2
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -56,7 +57,7 @@ class Scene(QGraphicsScene):
 
     def removeItem(self, item):
         if isinstance(item, VideoPreviewItem):
-            self.previews_items.remove(item) # todo: get rid of this. Bug prone code
+            self.previews_items.remove(item)  # todo: get rid of this. Bug prone code
 
         super().removeItem(item)
 
@@ -146,7 +147,7 @@ class PreviewWindow(QWidget):
     item_removed = pyqtSignal(ClipMetaData)
     TRACK_VIEW_HEIGHT = 40
     MAX_PX_PER_SEC = 100
-    ZOOM_VARIANTS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 20, 30, 50, 100]
+    ZOOM_VARIANTS = [0.2, 0.5, 1, 2, 5, 10, 15, 20, 30, 50, 100]
 
     def __init__(self):
         super().__init__()
@@ -154,7 +155,7 @@ class PreviewWindow(QWidget):
         self.threadpool = QThreadPool()
         self.scene = Scene()
         self.clips_previews = []
-        self.pixels_per_second = 10 # frames per sec = 10[px/sec] / 70 [px] =0.1428 frames per sec
+        self.pixels_per_second = 10  # frames per sec = 10[px/sec] / 70 [px] =0.1428 frames per sec
         self.scene.selectionChanged.connect(self.on_selectionChanged)
         self.grpTicks = QGraphicsItemGroup()
         self.grpLabels = QGraphicsItemGroup()
@@ -212,6 +213,10 @@ class PreviewWindow(QWidget):
         if selected_items:
             self.item_selected.emit(selected_items[0].clip_data)
 
+    @pyqtSlot(str)
+    def on_analysis_error(self, error: str):
+        print(error)
+
     def init_scene_mock(self):
         if not DEBUG:
             return
@@ -241,9 +246,6 @@ class PreviewWindow(QWidget):
     def on_analysis_ready(self, clip_data: ClipMetaData):
         self.add_preview_item(clip_data)
 
-    def on_analysis_error(self, error: str):
-        print(error)
-
     def add_video_track(self, file_path: str):
         worker = VideoDataAnalyzer(file_path,
                                    px_per_sec=self.pixels_per_second,
@@ -266,9 +268,9 @@ class PreviewWindow(QWidget):
             self.scene.setSceneRect(0, 0, self.track_view.width(), self.TRACK_VIEW_HEIGHT)
 
     # _________________ PORTED _____________________
-    def _calc_timeline_width(self) ->int:
+    def _calc_timeline_width(self) -> int:
         width = self.scene.sceneRect().width()
-        return int(width if width > 100*self.pixels_per_second else 100*self.pixels_per_second)
+        return int(width if width > 100 * self.pixels_per_second else 100 * self.pixels_per_second)
 
     def draw_time_line(self):
         self.grpLabels.setPos(0, 0)
@@ -284,10 +286,10 @@ class PreviewWindow(QWidget):
 
         for px in range(0, self._calc_timeline_width(), 10):
             tick_height = 10
-            if px%(5*10) == 0:
+            if px % (5 * 10) == 0:
                 tick_height = 20
 
-            tick = TimelineTickItem(px, 0, px, tick_height)
+            tick = TimelineTickItem(px + self.scene.ITEMS_ROFFSET, 0, px + self.scene.ITEMS_ROFFSET, tick_height)
             self.grpTicks.addToGroup(tick)
 
     def draw_labels(self):
@@ -297,8 +299,8 @@ class PreviewWindow(QWidget):
         label_tick_height = 20
         step_px = 50
         for px in range(step_px, self._calc_timeline_width(), step_px):
-            label = QGraphicsTextItem(str(round(px/self.pixels_per_second, 1)))
-            label.setPos(px - 10, label_tick_height)
+            label = QGraphicsTextItem(str(round(px / self.pixels_per_second, 1)))
+            label.setPos(px + self.scene.ITEMS_ROFFSET - 10, label_tick_height)
             self.grpLabels.addToGroup(label)
 
     def zoom_in(self):
@@ -321,7 +323,6 @@ class PreviewWindow(QWidget):
 
     def change_preview_size(self):
         pass
-
 
 
 if __name__ == '__main__':

@@ -31,7 +31,7 @@ class StoryboardCreator:
         buffer = b''
         start_marker = b'\x89PNG\r\n\x1a\n'
         end_marker = b'IEND\xaeB`\x82'
-        chunk_size = 65536
+        chunk_size = 8192*8
 
         while True:
             try:
@@ -60,29 +60,35 @@ class StoryboardCreator:
 
         proc.terminate()
 
-    def _ffmpeg_extract_frames(self, video_path: str, time_step: float, width: int, height: int,
+    def _ffmpeg_extract_frames(self, filename: str,
+                               time_step: float,
+                               width: int,
+                               height: int,
                                last_frame_percentage: float):
-        frames = [np.array(frame) for frame in self.extract_frames_from_pipe(video_path, time_step, width, height)]
+
+        frames = [np.array(frame) for frame in self.extract_frames_from_pipe(filename, time_step, width, height)]
         last_frame = self._truncate_frame(frames[-1], last_frame_percentage)
         frames[-1] = last_frame
+        print(f"file: {filename}; width= {width},height= {width}")
         return frames
 
-    def _truncate_frame(self, frame, last_frame_percentage) -> np.ndarray:
+    @staticmethod
+    def _truncate_frame(frame:np.ndarray, last_frame_percentage:float) -> np.ndarray:
         h, w, _ = frame.shape
         new_w = int(w * last_frame_percentage)
         new_w -= new_w % 4
         return frame[:, :new_w, :]
 
     def generate_preview_data(self,
-                              video_file_clip: VideoFileClip,
+                              filename: str,
                               time_step: float,
-                              last_frame_percentage: float) -> PreviewData:
-        # frames_list = self.extract_storyboard_frames(video_file_clip, time_marks, last_frame_percentage)
+                              last_frame_percentage: float,
+                              w: int, h: int) -> PreviewData:
 
-        frames_list = self._ffmpeg_extract_frames(video_file_clip.filename,
+        frames_list = self._ffmpeg_extract_frames(filename,
                                                   time_step,
-                                                  width=72,
-                                                  height=40,
+                                                  width=w,
+                                                  height=h,
                                                   last_frame_percentage=last_frame_percentage
                                                   )
         preview_data = PreviewData()
@@ -115,37 +121,34 @@ class VideoDataAnalyzer(QRunnable):
         self.duration_in_px = int(self.clip_metadata.duration_s * self.px_per_sec)
         self.frame_resize_coef = self.scaled_frame_height / self.clip_metadata.height
         self.scaled_frame_width = int(self.clip_metadata.width * self.frame_resize_coef)
+        self.scaled_frame_width -= self.scaled_frame_width % 4
+        if self.scaled_frame_width == 0:
+            self.scaled_frame_width = 4
 
-    def _create_time_marks(self):
-        step = self.scaled_frame_width / self.px_per_sec
-        time_marks = []
-        time_mark = 0
-        while time_mark < self.clip_metadata.duration_s:
-            time_marks.append(round(time_mark, 2))  #
-            time_mark += step
-
-        return time_marks
-
-    def generate_preview(self, video_file_clip: VideoFileClip):
+    def generate_preview(self, filename: str):
         preview_creator = StoryboardCreator()
         last_frame_width = int(self.duration_in_px % self.scaled_frame_width)  # 675 % 88 = 59
         last_frame_percentage = last_frame_width / self.scaled_frame_width  # 0.6704
-        time_step = self.scaled_frame_width / self.px_per_sec
+        time_step_seconds = self.scaled_frame_width / self.px_per_sec
         # ________________ TEMP ___________________________
-        if time_step > self.clip_metadata.duration_s:
-            time_step = self.clip_metadata.duration_s
+        if time_step_seconds > self.clip_metadata.duration_s:
+            time_step_seconds = self.clip_metadata.duration_s
 
         # TODO: доделать
 
-        print(time_step)
-        return preview_creator.generate_preview_data(video_file_clip, time_step, last_frame_percentage)
+        return preview_creator.generate_preview_data(filename,
+                                                     time_step_seconds,
+                                                     last_frame_percentage,
+                                                     w=self.scaled_frame_width,
+                                                     h=self.scaled_frame_height
+                                                     )
 
     def run(self):
         try:
             clip = VideoFileClip(self.clip_metadata.filename)
             self.scan_metadata(clip)
-            clip = clip.resized(height=self.scaled_frame_height)
-            preview_data = self.generate_preview(clip)
+            clip.close()
+            preview_data = self.generate_preview(self.clip_metadata.filename)
 
             # ______________TEMP_______________________________
             self.clip_metadata.preview_small = preview_data.preview
@@ -154,7 +157,6 @@ class VideoDataAnalyzer(QRunnable):
             self.clip_metadata.duration_in_px = self.duration_in_px
             # ______________TEMP_______________________________
 
-            clip.close()
         except Exception as e:
             self.signals.error.emit("ERROR " + str(e))
         else:
