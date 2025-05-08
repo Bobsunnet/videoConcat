@@ -155,7 +155,7 @@ class PreviewWindow(QWidget):
         self.threadpool = QThreadPool()
         self.scene = Scene()
         self.clips_previews = []
-        self.pixels_per_second = 10  # frames per sec = 10[px/sec] / 70 [px] =0.1428 frames per sec
+        self.pixels_per_second = self.ZOOM_VARIANTS[5]  # frames per sec = 10[px/sec] / 70 [px] =0.1428 frames per sec
         self.scene.selectionChanged.connect(self.on_selectionChanged)
         self.grpTicks = QGraphicsItemGroup()
         self.grpLabels = QGraphicsItemGroup()
@@ -221,8 +221,7 @@ class PreviewWindow(QWidget):
         if not DEBUG:
             return
 
-        for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid2.mp4',
-                                       'D:/PythonProjects/videoConcat/video/video_v1.mp4', ]):
+        for i, file_path in enumerate([                                       'D:/PythonProjects/videoConcat/video/video_v1.mp4', ]):
             self.add_video_track(file_path)
 
     def _find_last_pos_x(self):

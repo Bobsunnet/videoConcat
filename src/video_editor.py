@@ -7,6 +7,7 @@ from src.UI.color import ColorBackground, ColorOptions
 from src.UI.progress_bar import ProgressBar
 from src import debug_manager
 from src.workers import ConcatenatorWorker
+from src.utils import extract_file_name
 
 
 class VideoEditor(QWidget):
@@ -104,8 +105,9 @@ class VideoEditor(QWidget):
         """
         concat_final_name = ''
         for file_name in files_list:
-            concat_final_name += os.path.split(file_name)[-1].rpartition('.')[0]
+            concat_final_name += extract_file_name(file_name)
             concat_final_name += '__'
+            print(file_name)
 
         concat_final_name += '.mp4'
         save_path = os.path.join(folder_path, concat_final_name)

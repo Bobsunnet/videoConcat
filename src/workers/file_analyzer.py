@@ -1,75 +1,44 @@
-import io
-import subprocess
+import math
+import os
 
 import numpy as np
-import imageio_ffmpeg
+from PIL import Image
 
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable
 from PyQt6.QtGui import QImage, QPixmap
 from moviepy import VideoFileClip
-from PIL import Image
 
+from src.ffmpeg_extractor import extract_frames_to_folder, extract_frames_from_pipe
 from src.schemas import ClipMetaData
 from src.schemas import PreviewData
+from src.utils import extract_file_name
 
 
 class StoryboardCreator:
+    def __init__(self, filename:str, width:int, height:int):
+        self.width = width
+        self.height = height
+        self.folder_name = extract_file_name(filename)
+        if not os.path.exists(f"snaps/{self.folder_name}"):
+            os.mkdir(f"snaps/{self.folder_name}")
+            extract_frames_to_folder(filename, width, height)
 
-    def extract_frames_from_pipe(self, video_path: str, time_step: float, width: int, height: int):
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+        self.all_frames_list = [file for file in os.listdir(f"snaps/{self.folder_name}") if file.endswith(".png")]
 
-        command = [
-            ffmpeg_path,
-            "-i", video_path,
-            "-vf", f"fps=1/{time_step}",
-            "-s", f"{width}x{height}",
-            "-f", "image2pipe",
-            "-vcodec", "png",
-            "-"]
+    def _prepare_frames(self, duration_in_px:int):
+        frames_count = math.ceil(duration_in_px / self.width)
+        step = len(self.all_frames_list)//frames_count
+        # print(f'[FRAMES COUNT ] = {frames_count}, step: {step}')
+        for frame_name in self.all_frames_list[::step]:
+            with Image.open(f"snaps/{self.folder_name}/{frame_name}") as im:
+                yield im
 
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        buffer = b''
-        start_marker = b'\x89PNG\r\n\x1a\n'
-        end_marker = b'IEND\xaeB`\x82'
-        chunk_size = 8192*8
+    def get_storyboard_frames(self, last_frame_percentage: float, duration_in_px:int):
+        frames = [np.array(frame) for frame in self._prepare_frames(duration_in_px)]
+        if last_frame_percentage:
+            last_frame = self._truncate_frame(frames[-1], last_frame_percentage)
+            frames[-1] = last_frame
 
-        while True:
-            try:
-                chunk = proc.stdout.read(chunk_size)
-                if not chunk:
-                    break
-
-                buffer += chunk
-
-                while True:
-                    start_idx = buffer.find(start_marker)
-                    if start_idx == -1:
-                        break
-
-                    end_idx = buffer.find(end_marker)
-                    if end_idx == -1:
-                        break
-
-                    img_data_bytes = buffer[start_idx:end_idx + 8]
-                    buffer = buffer[end_idx + 8:]
-                    img = Image.open(io.BytesIO(img_data_bytes))
-                    yield img
-
-            except Exception as e:
-                print(e)
-
-        proc.terminate()
-
-    def _ffmpeg_extract_frames(self, filename: str,
-                               time_step: float,
-                               width: int,
-                               height: int,
-                               last_frame_percentage: float):
-
-        frames = [np.array(frame) for frame in self.extract_frames_from_pipe(filename, time_step, width, height)]
-        last_frame = self._truncate_frame(frames[-1], last_frame_percentage)
-        frames[-1] = last_frame
-        print(f"file: {filename}; width= {width},height= {width}")
         return frames
 
     @staticmethod
@@ -79,18 +48,8 @@ class StoryboardCreator:
         new_w -= new_w % 4
         return frame[:, :new_w, :]
 
-    def generate_preview_data(self,
-                              filename: str,
-                              time_step: float,
-                              last_frame_percentage: float,
-                              w: int, h: int) -> PreviewData:
-
-        frames_list = self._ffmpeg_extract_frames(filename,
-                                                  time_step,
-                                                  width=w,
-                                                  height=h,
-                                                  last_frame_percentage=last_frame_percentage
-                                                  )
+    def generate_preview_data(self,last_frame_percentage: float, duration_in_px:int) -> PreviewData:
+        frames_list = self.get_storyboard_frames(last_frame_percentage, duration_in_px)
         preview_data = PreviewData()
         preview_data.preview = _frame_to_pixmap(frames_list[0])
         preview_data.storyboard = _frame_to_pixmap(np.hstack(frames_list))
@@ -110,7 +69,7 @@ class VideoDataAnalyzer(QRunnable):
 
         self.clip_metadata = ClipMetaData(file_path)
         self.px_per_sec = px_per_sec
-        self.scaled_frame_height = preview_frame_height
+        self.preview_frame_height = preview_frame_height
         self.frame_resize_coef = 0
         self.duration_in_px = 0
         self.scaled_frame_width = 0
@@ -119,29 +78,18 @@ class VideoDataAnalyzer(QRunnable):
         self.clip_metadata.duration_s = video_file_clip.duration
         self.clip_metadata.width, self.clip_metadata.height = video_file_clip.size
         self.duration_in_px = int(self.clip_metadata.duration_s * self.px_per_sec)
-        self.frame_resize_coef = self.scaled_frame_height / self.clip_metadata.height
+        self.frame_resize_coef = self.preview_frame_height / self.clip_metadata.height
         self.scaled_frame_width = int(self.clip_metadata.width * self.frame_resize_coef)
         self.scaled_frame_width -= self.scaled_frame_width % 4
         if self.scaled_frame_width == 0:
             self.scaled_frame_width = 4
 
     def generate_preview(self, filename: str):
-        preview_creator = StoryboardCreator()
         last_frame_width = int(self.duration_in_px % self.scaled_frame_width)  # 675 % 88 = 59
         last_frame_percentage = last_frame_width / self.scaled_frame_width  # 0.6704
-        time_step_seconds = self.scaled_frame_width / self.px_per_sec
-        # ________________ TEMP ___________________________
-        if time_step_seconds > self.clip_metadata.duration_s:
-            time_step_seconds = self.clip_metadata.duration_s
+        preview_creator = StoryboardCreator(filename, self.scaled_frame_width, self.preview_frame_height)
 
-        # TODO: доделать
-
-        return preview_creator.generate_preview_data(filename,
-                                                     time_step_seconds,
-                                                     last_frame_percentage,
-                                                     w=self.scaled_frame_width,
-                                                     h=self.scaled_frame_height
-                                                     )
+        return preview_creator.generate_preview_data(last_frame_percentage, self.duration_in_px)
 
     def run(self):
         try:
