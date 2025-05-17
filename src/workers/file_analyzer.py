@@ -9,14 +9,8 @@ from PyQt6.QtGui import QImage, QPixmap
 from moviepy import VideoFileClip
 
 from src.ffmpeg_extractor import extract_frames_to_folder
-from src.ffmpeg_extractor.tools import create_snaps_folder
 from src.schemas import ClipMetaData
 from src.schemas import PreviewData
-from src.utils import extract_file_name
-
-from src.options import BASEDIR
-
-SNAPS_FOLDER = os.path.join(BASEDIR, 'snaps')
 
 
 class StoryboardCreatorSignals(QObject):
@@ -87,40 +81,10 @@ class VideoDataAnalyzer(QRunnable):
         super().__init__()
         self.signals = VideoDataAnalyzerSignals()
         self.video_path = file_path
-
-        # self.clip_metadata = ClipMetaData(file_path)  # --
         self.preview_frame_height = preview_frame_height
         self.frame_resize_coef = 0
         self.duration_in_px = 0
         self.scaled_frame_width = 0
-
-    # def scan_metadata(self, video_file_clip: VideoFileClip):
-    #     self.clip_metadata.duration_s = video_file_clip.duration
-    #     self.clip_metadata.width, self.clip_metadata.height = video_file_clip.size
-    #     self.duration_in_px = int(self.clip_metadata.duration_s * self.px_per_sec)
-    #     self.frame_resize_coef = self.preview_frame_height / self.clip_metadata.height
-    #
-    #     self.scaled_frame_width = int(self.clip_metadata.width * self.frame_resize_coef)
-    #     self.scaled_frame_width -= self.scaled_frame_width % 4
-    #
-    #     if self.scaled_frame_width == 0:
-    #         self.scaled_frame_width = 4
-
-    # def generate_preview(self, filename: str):
-    #     last_frame_width = int(self.duration_in_px % self.scaled_frame_width)  # 675 % 88 = 59
-    #     last_frame_percentage = last_frame_width / self.scaled_frame_width  # 0.6704
-    #     preview_creator = StoryboardCreator(filename, self.scaled_frame_width, self.preview_frame_height)
-    #
-    #     return preview_creator.generate_preview_data(last_frame_percentage, self.duration_in_px)
-
-    def save_enough_frames(self, filename: str, frame_width: int, frame_height: int) ->str:
-        folder_name = extract_file_name(filename)
-        folder_path = os.path.join(SNAPS_FOLDER, folder_name)
-        if not os.path.exists(folder_path):
-            os.mkdir(folder_path)
-            extract_frames_to_folder(filename, frame_width, frame_height)
-
-        return folder_path
 
     def analyze_clip(self) -> ClipMetaData:
         clip = VideoFileClip(self.video_path)
@@ -129,13 +93,12 @@ class VideoDataAnalyzer(QRunnable):
         clip.close()
 
         frame_resize_coef = self.preview_frame_height / height
-
         scaled_frame_width = int(width * frame_resize_coef)
         scaled_frame_width -= scaled_frame_width % 4
         if scaled_frame_width == 0:
             scaled_frame_width = 4
 
-        all_frames_folder = self.save_enough_frames(self.video_path, scaled_frame_width, self.preview_frame_height)
+        all_frames_folder = extract_frames_to_folder(self.video_path, scaled_frame_width, self.preview_frame_height)
 
         return ClipMetaData(self.video_path,
                             duration_s,
@@ -148,15 +111,6 @@ class VideoDataAnalyzer(QRunnable):
     def run(self):
         try:
             clip_metadata = self.analyze_clip()
-            print(clip_metadata)
-            # preview_data = self.generate_preview(self.clip_metadata.filename)
-            #
-            # # ______________TEMP_______________________________
-            # self.clip_metadata.preview_small = preview_data.preview
-            # self.clip_metadata.preview_large = preview_data.storyboard
-            # self.clip_metadata.preview_frames_count = preview_data.storyboard_frames_count
-            # self.clip_metadata.duration_in_px = self.duration_in_px
-            # ______________TEMP_______________________________
 
         except Exception as e:
             self.signals.error.emit("ERROR " + str(e))

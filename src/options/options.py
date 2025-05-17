@@ -1,3 +1,4 @@
+import os
 import pathlib
 
 
@@ -7,3 +8,4 @@ class Options:
 options = Options()
 DEBUG = True
 BASEDIR = pathlib.Path(__file__).parent.parent.parent
+SNAPS_FOLDER = os.path.join(BASEDIR, 'snaps')

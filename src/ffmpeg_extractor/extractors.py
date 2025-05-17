@@ -1,4 +1,5 @@
 import io
+import os
 
 import imageio_ffmpeg
 import subprocess
@@ -6,10 +7,21 @@ import subprocess
 from PIL import Image
 
 from src.ffmpeg_extractor.tools import create_snaps_folder
+from src.options import SNAPS_FOLDER
 from src.utils import extract_file_name
 
 
-def extract_frames_to_folder(video_path: str, width: int, height: int):
+def extract_frames_to_folder(filename: str, frame_width: int, frame_height: int) -> str:
+    folder_name = extract_file_name(filename)
+    folder_path = os.path.join(SNAPS_FOLDER, folder_name)
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
+        ffmpeg_make_extraction_to_folder(filename, frame_width, frame_height)
+
+    return folder_path
+
+
+def ffmpeg_make_extraction_to_folder(video_path: str, width: int, height: int):
     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
     video_name = extract_file_name(video_path)
     create_snaps_folder(video_name)

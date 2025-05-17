@@ -1,1 +1,1 @@
-from .extractors import extract_frames_to_folder, extract_frames_from_pipe
+from .extractors import extract_frames_to_folder
