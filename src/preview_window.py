@@ -6,8 +6,9 @@ from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QPushButton, QWidget,
 from src import debug_manager
 from src.UI.color import ColorOptions
 from src.options import DEBUG
-from src.schemas import ClipMetaData
+from src.schemas import ClipMetaData, PreviewData
 from src.workers import VideoDataAnalyzer
+from src.workers.file_analyzer import StoryboardCreator
 
 
 class TracksView(QGraphicsView):
@@ -87,14 +88,14 @@ class VideoPreviewItem(QGraphicsPixmapItem):
     DEFAULT_Z_VALUE = 0
     SELECTED_Z_VALUE = 1
 
-    def __init__(self, pixmap: QPixmap, scene: Scene, init_pos: QPointF, clip: ClipMetaData):
+    def __init__(self, pixmap: QPixmap, scene: Scene, init_pos: QPointF, clip_metadata: ClipMetaData):
         super().__init__(pixmap)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.scene = scene
         self.prev_pos = init_pos
-        self.clip_data = ClipMetaData(clip.filename)
+        self.clip_metadata = clip_metadata
         self.setPos(init_pos)
 
     def _change_order(self, proposed_pos: QPointF):
@@ -139,7 +140,7 @@ class VideoPreviewItem(QGraphicsPixmapItem):
         super().mouseReleaseEvent(event)
 
     def __repr__(self):
-        return f'{self.clip_data.filename}; pos: {self.x()}'
+        return f'{self.clip_metadata.filename}; pos: {self.x()}'
 
 
 class PreviewWindow(QWidget):
@@ -203,7 +204,7 @@ class PreviewWindow(QWidget):
             selected_item = items[0]
             self.scene.removeItem(selected_item)
             self.scene.remove_field_gaps()
-            self.item_removed.emit(selected_item.clip_data)
+            self.item_removed.emit(selected_item.clip_metadata)
             # selected_item.deleteLater()
         self.update_scene_rect()
 
@@ -211,7 +212,7 @@ class PreviewWindow(QWidget):
     def on_selectionChanged(self):
         selected_items = self.scene.selectedItems()
         if selected_items:
-            self.item_selected.emit(selected_items[0].clip_data)
+            self.item_selected.emit(selected_items[0].clip_metadata)
 
     @pyqtSlot(str)
     def on_analysis_error(self, error: str):
@@ -232,22 +233,37 @@ class PreviewWindow(QWidget):
 
         return pos_x
 
-    def create_preview_item(self, clip_meta_data: ClipMetaData):
-        scaled_pixmap = clip_meta_data.preview_large.scaled(clip_meta_data.duration_in_px, self.TRACK_VIEW_HEIGHT)
+    def create_preview_item(self, preview_data: PreviewData):
+        scaled_pixmap = preview_data.storyboard.scaled(preview_data.duration_in_px, self.TRACK_VIEW_HEIGHT)
         position = QPointF(self._find_last_pos_x(), 0)
-        return VideoPreviewItem(scaled_pixmap, self.scene, position, clip_meta_data)
+        return VideoPreviewItem(scaled_pixmap, self.scene, position, preview_data.clip_metadata)
 
-    def add_preview_item(self, clip_meta_data: ClipMetaData):
-        preview = self.create_preview_item(clip_meta_data)
+    def on_storyboard_ready(self, preview_data: PreviewData):
+        self.add_preview_item(preview_data)
+
+    @pyqtSlot(str)
+    def on_storyboard_error(self, error: str):
+        print(error)
+
+    def run_storyboard_creation_worker(self, clip_metadata: ClipMetaData):
+        duration_in_px = int(clip_metadata.duration_s * self.pixels_per_second)
+        last_frame_width = int(duration_in_px % clip_metadata.scaled_width)  # 675 % 88 = 59
+        last_frame_percentage = last_frame_width / clip_metadata.scaled_width  # 0.6704
+        worker = StoryboardCreator(clip_metadata, duration_in_px, last_frame_percentage)
+        worker.signals.finished.connect(self.on_storyboard_ready)
+        worker.signals.error.connect(self.on_storyboard_error)
+        self.threadpool.start(worker)
+
+    def add_preview_item(self, preview_data: PreviewData):
+        preview = self.create_preview_item(preview_data)
         self.scene.addItem(preview)
         self.update_scene_rect()
 
-    def on_analysis_ready(self, clip_data: ClipMetaData):
-        self.add_preview_item(clip_data)
+    def on_analysis_ready(self, clip_metadata: ClipMetaData):
+        self.run_storyboard_creation_worker(clip_metadata)
 
     def add_video_track(self, file_path: str):
         worker = VideoDataAnalyzer(file_path,
-                                   px_per_sec=self.pixels_per_second,
                                    preview_frame_height=self.TRACK_VIEW_HEIGHT)
         worker.signals.finished.connect(self.on_analysis_ready)
         worker.signals.error.connect(self.on_analysis_error)
