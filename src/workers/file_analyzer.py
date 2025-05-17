@@ -32,7 +32,7 @@ class StoryboardCreator(QRunnable):
     def _prepare_frames(self):
         frames_count = math.ceil(self.duration_in_px / self.clip_metadata.scaled_width)
         step = len(self.all_frames_list) // frames_count
-        # print(f'[FRAMES COUNT ] = {frames_count}, step: {step}')
+        # print(f'\n[FRAMES COUNT ] = {frames_count}, step: {step}')
         for frame_name in self.all_frames_list[::step]:
             with Image.open(os.path.join(self.clip_metadata.all_frames_folder, frame_name)) as img:
                 yield img

@@ -8,6 +8,11 @@ from src.preview_window import PreviewWindow
 from src.UI.color import ColorBackground, ColorOptions
 
 from src.updater import UpdateManager
+from src.options import SNAPS_FOLDER
+
+if not os.path.exists(SNAPS_FOLDER):
+    print(SNAPS_FOLDER)
+    os.mkdir(SNAPS_FOLDER)
 
 
 class PreviewPlayerMediator:
@@ -69,10 +74,6 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
-    from src.options import SNAPS_FOLDER
-    if not os.path.exists(SNAPS_FOLDER):
-        os.mkdir(SNAPS_FOLDER)
-
     app = QApplication(sys.argv)
     window = MainWindow()
     window.video_player.audioOutput.setVolume(0.8)
