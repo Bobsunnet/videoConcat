@@ -222,7 +222,8 @@ class PreviewWindow(QWidget):
         if not DEBUG:
             return
 
-        for i, file_path in enumerate([                                       'D:/PythonProjects/videoConcat/video/video_v1.mp4', ]):
+        for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid_sample.avi',
+                                       'D:/PythonProjects/videoConcat/video/video_v1.mp4', ]):
             self.add_video_track(file_path)
 
     def _find_last_pos_x(self):
@@ -337,7 +338,13 @@ class PreviewWindow(QWidget):
         self.change_preview_size()
 
     def change_preview_size(self):
-        pass
+        clips_metadata_list = []
+        for preview in self.scene.get_items():
+            clips_metadata_list.append(preview.clip_metadata)
+            self.scene.removeItem(preview)
+
+        for clip_metadata in clips_metadata_list:
+            self.run_storyboard_creation_worker(clip_metadata)
 
 
 if __name__ == '__main__':
