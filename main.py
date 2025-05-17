@@ -1,3 +1,4 @@
+import os
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QStatusBar
 
@@ -68,6 +69,10 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
+    from src.options import SNAPS_FOLDER
+    if not os.path.exists(SNAPS_FOLDER):
+        os.mkdir(SNAPS_FOLDER)
+
     app = QApplication(sys.argv)
     window = MainWindow()
     window.video_player.audioOutput.setVolume(0.8)
