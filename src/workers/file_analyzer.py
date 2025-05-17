@@ -8,7 +8,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, QRunnable
 from PyQt6.QtGui import QImage, QPixmap
 from moviepy import VideoFileClip
 
-from src.ffmpeg_extractor import extract_frames_to_folder, extract_frames_from_pipe
+from src.ffmpeg_extractor import extract_frames_to_folder
 from src.schemas import ClipMetaData
 from src.schemas import PreviewData
 from src.utils import extract_file_name
@@ -91,6 +91,9 @@ class VideoDataAnalyzer(QRunnable):
 
         return preview_creator.generate_preview_data(last_frame_percentage, self.duration_in_px)
 
+    def analyze_clip(self)->ClipMetaData:
+        pass
+
     def run(self):
         try:
             clip = VideoFileClip(self.clip_metadata.filename)
@@ -111,7 +114,7 @@ class VideoDataAnalyzer(QRunnable):
             self.signals.finished.emit(self.clip_metadata)
 
 
-def _frame_to_pixmap(frame: np.ndarray):
+def _frame_to_pixmap(frame: np.ndarray) -> QPixmap:
     h, w, ch = frame.shape
     frame = np.ascontiguousarray(frame)
     image = QImage(frame.tobytes(), w, h, QImage.Format.Format_RGB888)

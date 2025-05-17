@@ -232,13 +232,13 @@ class PreviewWindow(QWidget):
 
         return pos_x
 
-    def create_preview_item(self, clip_data: ClipMetaData):
-        scaled_pixmap = clip_data.preview_large.scaled(clip_data.duration_in_px, self.TRACK_VIEW_HEIGHT)
+    def create_preview_item(self, clip_meta_data: ClipMetaData):
+        scaled_pixmap = clip_meta_data.preview_large.scaled(clip_meta_data.duration_in_px, self.TRACK_VIEW_HEIGHT)
         position = QPointF(self._find_last_pos_x(), 0)
-        return VideoPreviewItem(scaled_pixmap, self.scene, position, clip_data)
+        return VideoPreviewItem(scaled_pixmap, self.scene, position, clip_meta_data)
 
-    def add_preview_item(self, clip_data: ClipMetaData):
-        preview = self.create_preview_item(clip_data)
+    def add_preview_item(self, clip_meta_data: ClipMetaData):
+        preview = self.create_preview_item(clip_meta_data)
         self.scene.addItem(preview)
         self.update_scene_rect()
 

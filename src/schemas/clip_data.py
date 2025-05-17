@@ -9,6 +9,11 @@ class PreviewData:
     storyboard_frames_count: int = 0
     duration_in_px: int = 0
 
+    # preview_small: QPixmap = None  # --
+    # preview_large: QPixmap = None  # --
+    # preview_frames_count: int = 0  # --
+
+
 
 @dataclass
 class ClipMetaData:
@@ -16,10 +21,12 @@ class ClipMetaData:
     duration_s: float = 0.0
     width: int = 0
     height: int = 0
-    preview_small: QPixmap = None
-    preview_large: QPixmap = None
-    preview_frames_count: int = 0
-    duration_in_px: int = 0
+    all_frames_folder: str = None
+
+    preview_small: QPixmap = None # --
+    preview_large: QPixmap = None # --
+    preview_frames_count: int = 0 # --
+    duration_in_px: int = 0 # --
 
 
 
