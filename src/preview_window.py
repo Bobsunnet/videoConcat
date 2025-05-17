@@ -32,7 +32,7 @@ class TracksView(QGraphicsView):
         urls = event.mimeData().urls()
         for url in urls:
             file_path = url.toLocalFile()
-            self.parent().add_video_preview(file_path)
+            self.parent().add_video_track(file_path)
 
 
 class TimelineTickItem(QGraphicsLineItem):
