@@ -31,6 +31,7 @@ class PreviewWindow(QWidget):
         self.workers_manager = PreviewWorkersManager()
 
         self.pixels_per_second = self.ZOOM_VARIANTS[4]  # frames per sec = 10[px/sec] / 70 [px] =0.1428 frames per sec
+        self.timeline_renderer.draw(self.pixels_per_second, self._calc_timeline_width())
         self.scene.selectionChanged.connect(self.on_selection_changed)
 
         self.init_scene_mock()

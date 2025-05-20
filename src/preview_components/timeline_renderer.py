@@ -12,12 +12,14 @@ class TimelineRenderer:
         self.scene.addItem(self.grpLabels)
 
     def draw(self, px_per_sec, timeline_width):
-        self.draw_scale(timeline_width)
+        self.grpLabels.setPos(0, 0)
+        self.grpTicks.setPos(0, 0)
+        self.draw_ticks(timeline_width)
         self.draw_labels(px_per_sec, timeline_width)
         self.grpLabels.setPos(0, -38)
         self.grpTicks.setPos(0, -38)
 
-    def draw_scale(self, timeline_width):
+    def draw_ticks(self, timeline_width):
         for el in self.grpTicks.childItems():
             self.scene.removeItem(el)
 
