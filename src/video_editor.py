@@ -120,7 +120,7 @@ class VideoEditor(QWidget):
                                                   "*.mp3 *.m4a *.wav *.ogg *.flac *.m3u *.m3u8)")
 
         if filename != '':
-            self.preview_window.add_video_track(filename)
+            self.preview_window.call_analysis_worker(filename)
 
     @pyqtSlot(str)
     def worker_error(self, error:str):

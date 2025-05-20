@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QGraphicsPixmapItem, QGraphicsItem
 
 from src.schemas import ClipMetaData
 if TYPE_CHECKING:
-    from src.preview_window import Scene
+    from src.preview_components import Scene
 
 
 class VideoPreviewItem(QGraphicsPixmapItem):

@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
 
 from src.video_player import VideoPlayer
 from src.video_editor import VideoEditor
-from src.preview_window import PreviewWindow
+from src.preview_components import PreviewWindow
 from src.UI.color import ColorBackground, ColorOptions
 
 from src.updater import UpdateManager
