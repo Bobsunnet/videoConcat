@@ -1,66 +1,20 @@
+import time
+
 from PyQt6.QtCore import QPointF, QThreadPool, pyqtSignal, pyqtSlot, Qt
-from PyQt6.QtGui import QPixmap, QColor
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QPushButton, QWidget, QGraphicsItem, \
-    QGraphicsPixmapItem, QHBoxLayout, QVBoxLayout, QGraphicsLineItem, QGraphicsItemGroup, QGraphicsTextItem
+from PyQt6.QtWidgets import (QGraphicsScene, QPushButton, QWidget, QHBoxLayout,
+                             QVBoxLayout, QGraphicsItemGroup, QGraphicsTextItem)
 
 from src import debug_manager
 from src.UI.color import ColorOptions
-from src.options import DEBUG
 from src.schemas import ClipMetaData, PreviewData
+from src.tracks_view import TracksView, TimelineTickItem
+from src.video_preview_item import VideoPreviewItem
 from src.workers import VideoDataAnalyzer
 from src.workers.file_analyzer import StoryboardCreator
 
 
-class TracksView(QGraphicsView):
-    def __init__(self, parent: 'PreviewWindow' = None):
-        super().__init__(parent)
-        self.setAcceptDrops(True)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.accept()
-
-    def dragMoveEvent(self, event):
-        """ need to be reimplemented along with dragEnterEvent and dropEvent """
-        if event.mimeData().hasUrls():
-            event.accept()
-
-    def dropEvent(self, event):
-        urls = event.mimeData().urls()
-        for url in urls:
-            file_path = url.toLocalFile()
-            self.parent().add_video_track(file_path)
-
-
-class TimelineTickItem(QGraphicsLineItem):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setPen(QColor(240, 0, 55))
-        self.setZValue(1)
-
-
 class Scene(QGraphicsScene):
     ITEMS_ROFFSET = 2
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.previews_items = []
-
-    def addItem(self, item):
-        if isinstance(item, VideoPreviewItem):
-            self.previews_items.append(item)
-
-        super().addItem(item)
-
-    def removeItem(self, item):
-        if isinstance(item, VideoPreviewItem):
-            self.previews_items.remove(item)  # todo: get rid of this. Bug prone code
-
-        super().removeItem(item)
 
     def get_items(self) -> list:
         """
@@ -68,7 +22,8 @@ class Scene(QGraphicsScene):
 
         Used to keep the order of video previews in the correct order when the user moves them.
         """
-        return sorted(self.previews_items, key=lambda item: item.x())
+        return sorted([item for item in self.items() if isinstance(item, VideoPreviewItem)],
+                      key=lambda item: item.x())
 
     def remove_field_gaps(self):
         """
@@ -84,79 +39,24 @@ class Scene(QGraphicsScene):
                 pos_x += item.sceneBoundingRect().width()
 
 
-class VideoPreviewItem(QGraphicsPixmapItem):
-    DEFAULT_Z_VALUE = 0
-    SELECTED_Z_VALUE = 1
-
-    def __init__(self, pixmap: QPixmap, scene: Scene, init_pos: QPointF, clip_metadata: ClipMetaData):
-        super().__init__(pixmap)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
-        self.scene = scene
-        self.prev_pos = init_pos
-        self.clip_metadata = clip_metadata
-        self.setPos(init_pos)
-
-    def _change_order(self, proposed_pos: QPointF):
-        """"""
-        if proposed_pos == self.prev_pos:
-            return
-
-        last_grid_position = self.scene.ITEMS_ROFFSET
-        for item in self.scene.get_items():
-            if item.x() > last_grid_position:
-                item.update_position(QPointF(last_grid_position, 0))
-
-            if item.x() < proposed_pos.x():
-                last_grid_position += item.sceneBoundingRect().width()
-                continue
-            item.update_position(QPointF(last_grid_position, 0))
-            last_grid_position += item.sceneBoundingRect().width()
-
-    def update_position(self, pos: QPointF):
-        self.setPos(pos)
-        self.prev_pos = pos
-
-    def itemChange(self, change, value):
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
-            x = value.x()
-            if value.x() < 0:
-                x = 0
-
-            y = self.pixmap().height() // 2
-            self.setPos(x, y)
-
-        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
-            if value:  # value is 1 if item was selected and 0 if it was unselected
-                self.setZValue(self.SELECTED_Z_VALUE)
-            else:
-                self.setZValue(self.DEFAULT_Z_VALUE)
-
-        return super().itemChange(change, value)
-
-    def mouseReleaseEvent(self, event):
-        self._change_order(self.pos())
-        super().mouseReleaseEvent(event)
-
-    def __repr__(self):
-        return f'{self.clip_metadata.filename}; pos: {self.x()}'
-
-
 class PreviewWindow(QWidget):
     item_selected = pyqtSignal(ClipMetaData)
     item_removed = pyqtSignal(ClipMetaData)
+    resizing_completed = pyqtSignal()
     TRACK_VIEW_HEIGHT = 40
     MAX_PX_PER_SEC = 100
-    ZOOM_VARIANTS = [0.2, 0.5, 1, 2, 5, 10, 15, 20, 30, 50, 100]
+    ZOOM_VARIANTS = [0.5, 1, 2, 5, 10, 15, 20, 30, 50, 80, 100]
 
     def __init__(self):
         super().__init__()
 
         self.threadpool = QThreadPool()
         self.scene = Scene()
-        self.clips_previews = []
-        self.pixels_per_second = self.ZOOM_VARIANTS[5]  # frames per sec = 10[px/sec] / 70 [px] =0.1428 frames per sec
+        self.total_previews = 0
+        self.pending_previews = 0
+        self.original_previews_order = []
+
+        self.pixels_per_second = self.ZOOM_VARIANTS[4]  # frames per sec = 10[px/sec] / 70 [px] =0.1428 frames per sec
         self.scene.selectionChanged.connect(self.on_selectionChanged)
         self.grpTicks = QGraphicsItemGroup()
         self.grpLabels = QGraphicsItemGroup()
@@ -178,6 +78,7 @@ class PreviewWindow(QWidget):
         self.btn_zoom_in.clicked.connect(self.zoom_in)
         self.btn_zoom_out = QPushButton("-")
         self.btn_zoom_out.clicked.connect(self.zoom_out)
+        self.resizing_completed.connect(self.sort_after_resizing)
 
         debug_manager.register_widget(self.btn_debug)
 
@@ -191,8 +92,7 @@ class PreviewWindow(QWidget):
         self.setLayout(layout)
 
     def debug_pressed(self, value=None):
-        print(self.grpLabels.childItems()[1].pos())
-        print(self.grpTicks.childItems()[1].pos())
+        print(self.scene.get_items())
 
     def debug_action(self, *args):
         print('SIGNAL EMITTED')
@@ -203,9 +103,9 @@ class PreviewWindow(QWidget):
         if items:
             selected_item = items[0]
             self.scene.removeItem(selected_item)
-            self.scene.remove_field_gaps()
+            # self.scene.remove_field_gaps()
             self.item_removed.emit(selected_item.clip_metadata)
-            # selected_item.deleteLater()
+
         self.update_scene_rect()
 
     @pyqtSlot()
@@ -219,18 +119,17 @@ class PreviewWindow(QWidget):
         print(error)
 
     def init_scene_mock(self):
-        if not DEBUG:
-            return
-
-        for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid_sample.avi',
-                                       'D:/PythonProjects/videoConcat/video/video_v1.mp4', ]):
-            self.add_video_track(file_path)
+        if debug_manager.debug_is_on:
+            for i, file_path in enumerate(['D:/PythonProjects/videoConcat/video/vid_sample.avi',
+                                           'D:/PythonProjects/videoConcat/video/video_v1.mp4', ]):
+                self.add_video_track(file_path)
 
     def _find_last_pos_x(self):
         items_list = self.scene.get_items()
         pos_x = self.scene.ITEMS_ROFFSET
         if items_list:
-            pos_x = items_list[-1].x() + items_list[-1].sceneBoundingRect().width()
+            last_item_width = items_list[-1].sceneBoundingRect().width()
+            pos_x = items_list[-1].x() + last_item_width
 
         return pos_x
 
@@ -239,12 +138,22 @@ class PreviewWindow(QWidget):
         position = QPointF(self._find_last_pos_x(), 0)
         return VideoPreviewItem(scaled_pixmap, self.scene, position, preview_data.clip_metadata)
 
+    def add_preview_item(self, preview_data: PreviewData):
+        preview = self.create_preview_item(preview_data)
+        self.scene.addItem(preview)
+        self.update_scene_rect()
+
+    @pyqtSlot(PreviewData)
     def on_storyboard_ready(self, preview_data: PreviewData):
         self.add_preview_item(preview_data)
+        self.pending_previews -= 1
+        if self.pending_previews == 0:
+            self.resizing_completed.emit()
 
     @pyqtSlot(str)
     def on_storyboard_error(self, error: str):
         print(error)
+        self.pending_previews -= 1
 
     def run_storyboard_creation_worker(self, clip_metadata: ClipMetaData):
         duration_in_px = int(clip_metadata.duration_s * self.pixels_per_second)
@@ -254,11 +163,6 @@ class PreviewWindow(QWidget):
         worker.signals.finished.connect(self.on_storyboard_ready)
         worker.signals.error.connect(self.on_storyboard_error)
         self.threadpool.start(worker)
-
-    def add_preview_item(self, preview_data: PreviewData):
-        preview = self.create_preview_item(preview_data)
-        self.scene.addItem(preview)
-        self.update_scene_rect()
 
     def on_analysis_ready(self, clip_metadata: ClipMetaData):
         self.run_storyboard_creation_worker(clip_metadata)
@@ -325,6 +229,7 @@ class PreviewWindow(QWidget):
             return
 
         self.pixels_per_second = self.ZOOM_VARIANTS[zoom_idx + 1]
+        print(self.pixels_per_second)
         self.draw_time_line()
         self.change_preview_size()
 
@@ -337,14 +242,32 @@ class PreviewWindow(QWidget):
         self.draw_time_line()
         self.change_preview_size()
 
+    @pyqtSlot()
+    def sort_after_resizing(self):
+        pos_x = self.scene.ITEMS_ROFFSET
+        previews_sorted = sorted(self.scene.get_items(),
+                                 key=lambda item: self.original_previews_order.index(item.clip_metadata))
+        for el in previews_sorted:
+            el.setPos(pos_x, 0)
+            pos_x += el.boundingRect().width()
+
+        self.update_scene_rect()
+
     def change_preview_size(self):
         clips_metadata_list = []
+        self.original_previews_order = [preview.clip_metadata for preview in self.scene.get_items()]
+
         for preview in self.scene.get_items():
             clips_metadata_list.append(preview.clip_metadata)
             self.scene.removeItem(preview)
 
+        self.total_previews = len(clips_metadata_list)
+        self.pending_previews = self.total_previews
+
         for clip_metadata in clips_metadata_list:
             self.run_storyboard_creation_worker(clip_metadata)
+
+
 
 
 if __name__ == '__main__':

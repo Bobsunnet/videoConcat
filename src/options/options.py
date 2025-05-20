@@ -15,6 +15,6 @@ def get_base_dir():
 
 
 options = Options()
-DEBUG = False
+DEBUG = True
 BASEDIR = get_base_dir()
 SNAPS_FOLDER = os.path.join(BASEDIR, 'snaps')
