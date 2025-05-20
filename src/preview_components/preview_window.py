@@ -78,7 +78,7 @@ class PreviewWindow(QWidget):
         if items:
             selected_item = items[0]
             self.scene.removeItem(selected_item)
-            # self.scene.remove_field_gaps()
+            self.scene.remove_field_gaps()
             self.item_removed.emit(selected_item.clip_metadata)
 
         self.update_scene_rect()
